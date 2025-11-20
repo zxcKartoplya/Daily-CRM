@@ -15,11 +15,11 @@ class DepartmentUpdate(DepartmentBase):
 
 class DepartmentInDBBase(DepartmentBase):
     id: int
+    admin_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Department(DepartmentInDBBase):
     pass
-

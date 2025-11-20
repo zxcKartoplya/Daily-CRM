@@ -22,9 +22,8 @@ class StatisticInDBBase(StatisticBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Statistic(StatisticInDBBase):
     pass
-

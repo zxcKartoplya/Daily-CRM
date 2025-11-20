@@ -3,12 +3,13 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import require_admin
 from app.api.schemas.metric import Metric, MetricCreate, MetricUpdate
 from app.db.session import get_db
 from app.models import Metric as MetricModel
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 @router.get("/", response_model=List[Metric])
@@ -55,4 +56,3 @@ def delete_metric(metric_id: int, db: Session = Depends(get_db)) -> None:
 
     db.delete(metric)
     db.commit()
-

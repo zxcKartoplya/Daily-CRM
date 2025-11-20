@@ -18,9 +18,8 @@ class JobInDBBase(JobBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Job(JobInDBBase):
     pass
-
