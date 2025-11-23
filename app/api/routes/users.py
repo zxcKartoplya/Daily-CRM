@@ -29,7 +29,7 @@ def _ensure_user_access(user: UserModel | None, current_admin: AdminModel) -> Us
     return user
 
 
-@router.get("/", response_model=List[User])
+@router.get("", response_model=List[User])
 def list_users(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
@@ -53,7 +53,7 @@ def get_user(
     return _ensure_user_access(user, current_admin)
 
 
-@router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=User, status_code=status.HTTP_201_CREATED)
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),

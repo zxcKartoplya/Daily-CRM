@@ -30,7 +30,7 @@ def _ensure_task_access(task: TaskModel | None, current_admin: AdminModel) -> Ta
     return task
 
 
-@router.get("/", response_model=List[Task])
+@router.get("", response_model=List[Task])
 def list_tasks(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
@@ -55,7 +55,7 @@ def get_task(
     return _ensure_task_access(task, current_admin)
 
 
-@router.post("/", response_model=Task, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Task, status_code=status.HTTP_201_CREATED)
 def create_task(
     payload: TaskCreate,
     db: Session = Depends(get_db),

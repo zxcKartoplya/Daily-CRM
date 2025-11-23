@@ -13,7 +13,7 @@ from app.models import Admin as AdminModel
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Admin])
+@router.get("", response_model=List[Admin])
 def list_admins(
     db: Session = Depends(get_db),
     current_admin=Depends(require_admin),
@@ -33,7 +33,7 @@ def get_admin(
     return admin
 
 
-@router.post("/", response_model=Admin, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Admin, status_code=status.HTTP_201_CREATED)
 def create_admin(
     payload: AdminCreate,
     db: Session = Depends(get_db),

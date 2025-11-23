@@ -23,7 +23,7 @@ def _ensure_job_access(job: JobModel | None, current_admin: AdminModel) -> JobMo
     return job
 
 
-@router.get("/", response_model=List[Job])
+@router.get("", response_model=List[Job])
 def list_jobs(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
@@ -46,7 +46,7 @@ def get_job(
     return _ensure_job_access(job, current_admin)
 
 
-@router.post("/", response_model=Job, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Job, status_code=status.HTTP_201_CREATED)
 def create_job(
     payload: JobCreate,
     db: Session = Depends(get_db),

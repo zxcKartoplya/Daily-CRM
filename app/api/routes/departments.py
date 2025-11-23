@@ -12,7 +12,7 @@ from app.models import Department as DepartmentModel, Admin as AdminModel
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Department])
+@router.get("", response_model=List[Department])
 def list_departments(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
@@ -32,7 +32,7 @@ def get_department(
     return department
 
 
-@router.post("/", response_model=Department, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Department, status_code=status.HTTP_201_CREATED)
 def create_department(
     payload: DepartmentCreate,
     db: Session = Depends(get_db),

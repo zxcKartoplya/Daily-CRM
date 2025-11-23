@@ -30,7 +30,7 @@ def _ensure_statistic_access(statistic: StatisticModel | None, current_admin: Ad
     return statistic
 
 
-@router.get("/", response_model=List[Statistic])
+@router.get("", response_model=List[Statistic])
 def list_statistics(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
@@ -55,7 +55,7 @@ def get_statistic(
     return _ensure_statistic_access(statistic, current_admin)
 
 
-@router.post("/", response_model=Statistic, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Statistic, status_code=status.HTTP_201_CREATED)
 def create_statistic(
     payload: StatisticCreate,
     db: Session = Depends(get_db),
@@ -104,4 +104,3 @@ def delete_statistic(
 
     db.delete(statistic)
     db.commit()
-

@@ -12,7 +12,7 @@ from app.models import Metric as MetricModel
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
-@router.get("/", response_model=List[Metric])
+@router.get("", response_model=List[Metric])
 def list_metrics(db: Session = Depends(get_db)) -> List[Metric]:
     return db.query(MetricModel).all()
 
@@ -25,7 +25,7 @@ def get_metric(metric_id: int, db: Session = Depends(get_db)) -> Metric:
     return metric
 
 
-@router.post("/", response_model=Metric, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Metric, status_code=status.HTTP_201_CREATED)
 def create_metric(payload: MetricCreate, db: Session = Depends(get_db)) -> Metric:
     metric = MetricModel(**payload.dict())
     db.add(metric)
