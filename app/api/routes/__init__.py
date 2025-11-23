@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
-from app.api.routes import admins, departments, jobs, users, metrics, tasks, statistics
+from app.api.routes import admins, departments, jobs, users, metrics, tasks, statistics, auth
 
 
 router = APIRouter()
 
 router.include_router(admins.router, prefix="/admins", tags=["admins"])
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(departments.router, prefix="/departments", tags=["departments"])
 router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 router.include_router(users.router, prefix="/users", tags=["users"])

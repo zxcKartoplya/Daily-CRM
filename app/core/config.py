@@ -17,6 +17,10 @@ class Settings:
         self.gigachat_client_id: Optional[str] = os.getenv("GIGACHAT_CLIENT_ID")
         self.gigachat_client_secret: Optional[str] = os.getenv("GIGACHAT_CLIENT_SECRET")
 
+        # Auth
+        self.auth_secret: str = os.getenv("AUTH_SECRET", "CHANGE_ME_SECRET_KEY")
+        self.access_token_exp_minutes: int = int(os.getenv("ACCESS_TOKEN_EXP_MINUTES", "60"))
+
 
 @lru_cache()
 def get_settings() -> Settings:

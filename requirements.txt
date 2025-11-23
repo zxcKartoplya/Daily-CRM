@@ -6,3 +6,4 @@ sqlalchemy>=1.4
 alembic
 python-dotenv
 httpx
+PyJWT

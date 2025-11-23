@@ -1,6 +1,7 @@
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.security import verify_password, decode_access_token
 from app.db.session import get_db
 from app.models import Admin as AdminModel
 
@@ -8,39 +9,38 @@ from app.models import Admin as AdminModel
 def _get_admin_by_id(admin_id: int, db: Session) -> AdminModel:
     admin = db.query(AdminModel).get(admin_id)
     if not admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin not found")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin not found")
     return admin
 
 
-def require_admin(
-    admin_id_header: str | None = Header(None, alias="X-Admin-Id"),
-    db: Session = Depends(get_db),
-) -> AdminModel:
-    if admin_id_header is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="X-Admin-Id header is required",
-        )
-
+def _resolve_admin_from_token(token: str, db: Session) -> AdminModel:
     try:
-        admin_id = int(admin_id_header)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid admin id") from exc
+        payload = decode_access_token(token)
+        admin_id = int(payload.get("sub"))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token") from exc
 
     return _get_admin_by_id(admin_id, db)
+
+
+def require_admin(
+    authorization: str | None = Header(None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> AdminModel:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authorization header with Bearer token is required",
+        )
+    token = authorization.split(" ", 1)[1]
+    return _resolve_admin_from_token(token, db)
 
 
 def optional_admin(
-    admin_id_header: str | None = Header(None, alias="X-Admin-Id"),
+    authorization: str | None = Header(None, alias="Authorization"),
     db: Session = Depends(get_db),
 ) -> AdminModel | None:
-    if admin_id_header is None:
+    if not authorization or not authorization.lower().startswith("bearer "):
         return None
-
-    try:
-        admin_id = int(admin_id_header)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid admin id") from exc
-
-    return _get_admin_by_id(admin_id, db)
-
+    token = authorization.split(" ", 1)[1]
+    return _resolve_admin_from_token(token, db)
