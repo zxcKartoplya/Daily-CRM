@@ -45,3 +45,6 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+
+# API routes cache
+app/api/routes/__pycache__/
