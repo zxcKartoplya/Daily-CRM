@@ -22,4 +22,5 @@ class DepartmentInDBBase(DepartmentBase):
 
 
 class Department(DepartmentInDBBase):
-    pass
+    admin_name: str
+    employees_count: int
