@@ -19,7 +19,7 @@ class Settings:
 
         # Auth
         self.auth_secret: str = os.getenv("AUTH_SECRET", "CHANGE_ME_SECRET_KEY")
-        self.access_token_exp_minutes: int = int(os.getenv("ACCESS_TOKEN_EXP_MINUTES", "60"))
+        self.access_token_exp_minutes: int = int(os.getenv("ACCESS_TOKEN_EXP_MINUTES", "10080"))
 
 
 @lru_cache()
