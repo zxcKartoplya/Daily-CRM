@@ -19,15 +19,29 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "reviewers",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("description", sa.String(), nullable=False),
+    )
+
+    op.create_table(
         "jobs",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("department_id", sa.Integer(), nullable=False),
+        sa.Column("reviewer_id", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
             ["department_id"],
             ["departments.id"],
             name="fk_jobs_department_id_departments",
             ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["reviewer_id"],
+            ["reviewers.id"],
+            name="fk_jobs_reviewer_id_reviewers",
+            ondelete="SET NULL",
         ),
     )
 
@@ -83,4 +97,5 @@ def downgrade() -> None:
     op.drop_table("tasks")
     op.drop_table("users")
     op.drop_table("jobs")
+    op.drop_table("reviewers")
     op.drop_table("departments")

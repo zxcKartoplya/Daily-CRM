@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class JobBase(BaseModel):
     name: str
     department_id: int
+    reviewer_id: int | None = None
 
 
 class JobCreate(JobBase):

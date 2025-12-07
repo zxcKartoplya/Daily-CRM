@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_admin
 from app.api.schemas.job import Job, JobCreate, JobUpdate
 from app.db.session import get_db
-from app.models import Job as JobModel, Department as DepartmentModel, Admin as AdminModel
+from app.models import (
+    Job as JobModel,
+    Department as DepartmentModel,
+    Admin as AdminModel,
+    Reviewer as ReviewerModel,
+)
 
 
 router = APIRouter()
@@ -21,6 +26,14 @@ def _ensure_job_access(job: JobModel | None, current_admin: AdminModel) -> JobMo
     if not job or job.department.admin_id != current_admin.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return job
+
+
+def _ensure_reviewer_exists(db: Session, reviewer_id: int | None) -> None:
+    if reviewer_id is None:
+        return
+    reviewer = db.query(ReviewerModel).get(reviewer_id)
+    if not reviewer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
 
 
 @router.get("", response_model=List[Job])
@@ -54,6 +67,7 @@ def create_job(
 ) -> Job:
     department = db.query(DepartmentModel).get(payload.department_id)
     _ensure_department_access(department, current_admin)
+    _ensure_reviewer_exists(db, payload.reviewer_id)
 
     job = JobModel(**payload.dict())
     db.add(job)
@@ -75,6 +89,7 @@ def update_job(
     if payload.department_id != job.department_id:
         department = db.query(DepartmentModel).get(payload.department_id)
         _ensure_department_access(department, current_admin)
+    _ensure_reviewer_exists(db, payload.reviewer_id)
 
     for field, value in payload.dict().items():
         setattr(job, field, value)
