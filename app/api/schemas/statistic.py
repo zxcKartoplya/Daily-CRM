@@ -6,7 +6,6 @@ from pydantic import BaseModel
 class StatisticBase(BaseModel):
     date: date
     user_id: int
-    metric_id: int
     value: int
 
 

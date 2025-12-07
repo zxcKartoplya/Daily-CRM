@@ -7,7 +7,6 @@ class TaskBase(BaseModel):
     user_id: int
     date: date
     description: str
-    metric_id: int | None = None
 
 
 class TaskCreate(TaskBase):
