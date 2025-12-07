@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 def _to_department_response(
-    department: DepartmentModel, employees_count: int, admin: AdminModel
+    department: DepartmentModel, employees_count: int, jobs_count: int, admin: AdminModel
 ) -> Department:
     return Department(
         id=department.id,
@@ -27,14 +27,19 @@ def _to_department_response(
         admin_id=department.admin_id,
         admin_name=admin.full_name,
         employees_count=employees_count,
+        jobs_count=jobs_count,
     )
 
 
 def _get_department_with_counts(
     db: Session, department_id: int, current_admin: AdminModel
-) -> tuple[DepartmentModel, int] | None:
+) -> tuple[DepartmentModel, int, int] | None:
     return (
-        db.query(DepartmentModel, func.count(UserModel.id).label("employees_count"))
+        db.query(
+            DepartmentModel,
+            func.count(UserModel.id).label("employees_count"),
+            func.count(func.distinct(JobModel.id)).label("jobs_count"),
+        )
         .outerjoin(JobModel, JobModel.department_id == DepartmentModel.id)
         .outerjoin(UserModel, UserModel.job_id == JobModel.id)
         .filter(DepartmentModel.id == department_id, DepartmentModel.admin_id == current_admin.id)
@@ -49,8 +54,8 @@ def _get_department_response(
     result = _get_department_with_counts(db, department_id, current_admin)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
-    department, employees_count = result
-    return _to_department_response(department, employees_count, current_admin)
+    department, employees_count, jobs_count = result
+    return _to_department_response(department, employees_count, jobs_count, current_admin)
 
 
 @router.get("", response_model=List[Department])
@@ -59,7 +64,11 @@ def list_departments(
     current_admin: AdminModel = Depends(require_admin),
 ) -> List[Department]:
     departments = (
-        db.query(DepartmentModel, func.count(UserModel.id).label("employees_count"))
+        db.query(
+            DepartmentModel,
+            func.count(UserModel.id).label("employees_count"),
+            func.count(func.distinct(JobModel.id)).label("jobs_count"),
+        )
         .outerjoin(JobModel, JobModel.department_id == DepartmentModel.id)
         .outerjoin(UserModel, UserModel.job_id == JobModel.id)
         .filter(DepartmentModel.admin_id == current_admin.id)
@@ -67,8 +76,8 @@ def list_departments(
         .all()
     )
     return [
-        _to_department_response(department, employees_count, current_admin)
-        for department, employees_count in departments
+        _to_department_response(department, employees_count, jobs_count, current_admin)
+        for department, employees_count, jobs_count in departments
     ]
 
 
@@ -106,7 +115,7 @@ def update_department(
     if not department_with_count:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
 
-    department, _ = department_with_count
+    department, _, _ = department_with_count
 
     for field, value in payload.dict().items():
         setattr(department, field, value)

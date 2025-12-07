@@ -24,3 +24,4 @@ class DepartmentInDBBase(DepartmentBase):
 class Department(DepartmentInDBBase):
     admin_name: str
     employees_count: int
+    jobs_count: int
