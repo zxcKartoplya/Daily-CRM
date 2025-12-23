@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Any, Dict
 
 
 class ReviewerBase(BaseModel):
@@ -19,3 +20,11 @@ class Reviewer(ReviewerBase):
 
     class Config:
         from_attributes = True
+
+
+class ReviewerDescriptionRequest(BaseModel):
+    text: str
+
+
+class ReviewerDescriptionResponse(BaseModel):
+    gigachat_response: Dict[str, Any]

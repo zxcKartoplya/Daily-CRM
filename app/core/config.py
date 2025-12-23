@@ -2,9 +2,12 @@ from functools import lru_cache
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
+
 
 class Settings:
     def __init__(self) -> None:
+        load_dotenv()
         self.app_name: str = os.getenv("APP_NAME", "Daily CRM Backend")
         self.debug: bool = os.getenv("DEBUG", "true").lower() == "true"
 
@@ -14,9 +17,15 @@ class Settings:
 
         # GigaChat
         self.gigachat_base_url: Optional[str] = os.getenv("GIGACHAT_BASE_URL")
+        self.gigachat_oauth_url: Optional[str] = os.getenv("GIGACHAT_OAUTH_URL")
         self.gigachat_client_id: Optional[str] = os.getenv("GIGACHAT_CLIENT_ID")
         self.gigachat_client_secret: Optional[str] = os.getenv("GIGACHAT_CLIENT_SECRET")
+        self.gigachat_api_pers: Optional[str] = os.getenv("GIGACHAT_API_PERS")
+        self.gigachat_scope: str = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+        self.gigachat_model: str = os.getenv("GIGACHAT_MODEL", "GigaChat")
+        self.gigachat_verify_ssl: bool = os.getenv("GIGACHAT_VERIFY_SSL", "true").lower() == "true"
 
+        
         # Auth
         self.auth_secret: str = os.getenv("AUTH_SECRET", "CHANGE_ME_SECRET_KEY")
         self.access_token_exp_minutes: int = int(os.getenv("ACCESS_TOKEN_EXP_MINUTES", "10080"))

@@ -1,12 +1,20 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin
-from app.api.schemas.reviewer import Reviewer, ReviewerCreate, ReviewerUpdate
+from app.api.schemas.reviewer import (
+    Reviewer,
+    ReviewerCreate,
+    ReviewerDescriptionRequest,
+    ReviewerDescriptionResponse,
+    ReviewerUpdate,
+)
 from app.db.session import get_db
 from app.models import Reviewer as ReviewerModel
+from app.services.gigachat import GigaChatClient
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -32,6 +40,41 @@ def create_reviewer(payload: ReviewerCreate, db: Session = Depends(get_db)) -> R
     db.commit()
     db.refresh(reviewer)
     return reviewer
+
+
+@router.post("/description", response_model=ReviewerDescriptionResponse)
+def generate_description(payload: ReviewerDescriptionRequest) -> ReviewerDescriptionResponse:
+    try:
+        client = GigaChatClient()
+        response = client.chat(payload.text)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        detail = {
+            "status_code": exc.response.status_code,
+            "message": "GigaChat request failed",
+        }
+        try:
+            detail = exc.response.json()
+        except ValueError:
+            if exc.response.text:
+                detail = {
+                    "status_code": exc.response.status_code,
+                    "message": exc.response.text,
+                }
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=detail,
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GigaChat is unavailable: {exc}",
+        ) from exc
+    return ReviewerDescriptionResponse(gigachat_response=response)
 
 
 @router.put("/{reviewer_id}", response_model=Reviewer)
