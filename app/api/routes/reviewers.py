@@ -58,3 +58,8 @@ def delete_reviewer(reviewer_id: int, db: Session = Depends(get_db)) -> None:
 
     db.delete(reviewer)
     db.commit()
+
+
+@router.post("/description", status_code=status.HTTP_204_NO_CONTENT)
+def mama():
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
