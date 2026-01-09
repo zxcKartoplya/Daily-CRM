@@ -1,7 +1,6 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-import httpx
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin
@@ -42,41 +41,6 @@ def create_reviewer(payload: ReviewerCreate, db: Session = Depends(get_db)) -> R
     return reviewer
 
 
-@router.post("/description", response_model=ReviewerDescriptionResponse)
-def generate_description(payload: ReviewerDescriptionRequest) -> ReviewerDescriptionResponse:
-    try:
-        client = GigaChatClient()
-        response = client.chat(payload.text)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
-    except httpx.HTTPStatusError as exc:
-        detail = {
-            "status_code": exc.response.status_code,
-            "message": "GigaChat request failed",
-        }
-        try:
-            detail = exc.response.json()
-        except ValueError:
-            if exc.response.text:
-                detail = {
-                    "status_code": exc.response.status_code,
-                    "message": exc.response.text,
-                }
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=detail,
-        ) from exc
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"GigaChat is unavailable: {exc}",
-        ) from exc
-    return ReviewerDescriptionResponse(gigachat_response=response)
-
-
 @router.put("/{reviewer_id}", response_model=Reviewer)
 def update_reviewer(
     reviewer_id: int, payload: ReviewerUpdate, db: Session = Depends(get_db)
@@ -101,3 +65,25 @@ def delete_reviewer(reviewer_id: int, db: Session = Depends(get_db)) -> None:
 
     db.delete(reviewer)
     db.commit()
+
+
+@router.post("/description", response_model=ReviewerDescriptionResponse)
+def generate_description(payload: ReviewerDescriptionRequest) -> ReviewerDescriptionResponse:
+    client = GigaChatClient()
+    base_prompt = (
+        "Сформируй структурированное описание оценщика по короткому описанию. "
+        "Ответ верни строго в JSON без markdown и без пояснений. "
+        "Структура: {"
+        "\"name\": string, "
+        "\"summary\": string, "
+        "\"what_is_evaluated\": [string], "
+        "\"metrics\": [string], "
+        "\"process_steps\": [string], "
+        "\"required_inputs\": [string], "
+        "\"output_for_user\": string, "
+        "\"risks_and_limits\": [string]"
+        "}."
+    )
+    prompt = f"{base_prompt} Название оценщика: {payload.name}. Короткое описание оценщика: {payload.description}."
+    response = client.chat(prompt)
+    return ReviewerDescriptionResponse(gigachat_response=response)

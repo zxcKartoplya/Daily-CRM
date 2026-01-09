@@ -23,7 +23,8 @@ class Reviewer(ReviewerBase):
 
 
 class ReviewerDescriptionRequest(BaseModel):
-    text: str
+    name: str
+    description: str
 
 
 class ReviewerDescriptionResponse(BaseModel):
