@@ -1,4 +1,6 @@
 from typing import List
+import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -71,19 +73,31 @@ def delete_reviewer(reviewer_id: int, db: Session = Depends(get_db)) -> None:
 def generate_description(payload: ReviewerDescriptionRequest) -> ReviewerDescriptionResponse:
     client = GigaChatClient()
     base_prompt = (
+        # Метрика: значение 1-10, json_название (id поля), имя для пользователя, короткое описание что отслеживает
         "Сформируй структурированное описание оценщика по короткому описанию. "
-        "Ответ верни строго в JSON без markdown и без пояснений. "
+        "Ответ верни строго в JSON без markdown и без пояснений. Количество metrics должно быть от 4 и более. "
+        "Поле value должно быть числом от 1 до 10. (оно отображает ценность и приоритетность метрики, значит чем больше значение value тем ценне метрика)"
         "Структура: {"
         "\"name\": string, "
         "\"summary\": string, "
         "\"what_is_evaluated\": [string], "
-        "\"metrics\": [string], "
-        "\"process_steps\": [string], "
-        "\"required_inputs\": [string], "
-        "\"output_for_user\": string, "
-        "\"risks_and_limits\": [string]"
+        "\"metrics\": ["
+        "{"
+        "\"value\": number, "
+        "\"json_name\": string, "
+        "\"display_name\": string, "
+        "\"description\": string"
+        "}"
+        "],"
         "}."
     )
     prompt = f"{base_prompt} Название оценщика: {payload.name}. Короткое описание оценщика: {payload.description}."
     response = client.chat(prompt)
-    return ReviewerDescriptionResponse(gigachat_response=response)
+    content = response["choices"][0]["message"]["content"]
+    cleaned = re.sub(r"^```json\s*|\s*```$", "", content.strip(), flags=re.IGNORECASE)
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Invalid JSON from GigaChat: {exc}") from exc
+    return ReviewerDescriptionResponse(gigachat_response=data)
