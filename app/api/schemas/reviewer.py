@@ -1,10 +1,18 @@
 from pydantic import BaseModel
-from typing import Any, Dict, List
+from typing import List
+
+
+class Metric(BaseModel):
+    value: int
+    json_name: str
+    display_name: str
+    description: str
 
 
 class ReviewerBase(BaseModel):
     name: str
     description: str
+    metrics: List[Metric] | None = None
 
 
 class ReviewerCreate(ReviewerBase):
@@ -24,12 +32,6 @@ class Reviewer(ReviewerBase):
 
 class ReviewerDescriptionRequest(BaseModel):
     name: str
-    description: str
-
-class Metric(BaseModel):
-    value: int
-    json_name: str
-    display_name: str
     description: str
 
 class ReviewerDescriptionData(BaseModel):
