@@ -30,6 +30,17 @@ class Reviewer(ReviewerBase):
         from_attributes = True
 
 
+class ReviewerJobInfo(BaseModel):
+    id: int
+    name: str
+    department_id: int
+    department_name: str
+
+
+class ReviewerWithJobs(Reviewer):
+    jobs: List[ReviewerJobInfo]
+
+
 class ReviewerDescriptionRequest(BaseModel):
     name: str
     description: str
