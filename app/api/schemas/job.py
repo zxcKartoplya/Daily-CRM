@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class JobBase(BaseModel):
     name: str
+    description: str | None = None
     department_id: int
     reviewer_id: int | None = None
 
@@ -23,4 +24,4 @@ class JobInDBBase(JobBase):
 
 
 class Job(JobInDBBase):
-    pass
+    reviewer_name: str | None = None

@@ -9,6 +9,7 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False)
     reviewer_id = Column(Integer, ForeignKey("reviewers.id", ondelete="SET NULL"), nullable=True)
 
