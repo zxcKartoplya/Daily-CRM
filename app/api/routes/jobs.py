@@ -23,6 +23,7 @@ def _to_job_response(job: JobModel) -> Job:
         name=job.name,
         description=job.description,
         department_id=job.department_id,
+        department_name=job.department.name if job.department else None,
         reviewer_id=job.reviewer_id,
         reviewer_name=job.reviewer.name if job.reviewer else None,
     )
@@ -65,7 +66,7 @@ def list_jobs(
 ) -> List[Job]:
     jobs = (
         db.query(JobModel)
-        .options(joinedload(JobModel.reviewer))
+        .options(joinedload(JobModel.department), joinedload(JobModel.reviewer))
         .join(JobModel.department)
         .filter(DepartmentModel.admin_id == current_admin.id)
         .all()
@@ -79,7 +80,7 @@ def get_job(
     db: Session = Depends(get_db),
     current_admin: AdminModel = Depends(require_admin),
 ) -> Job:
-    job = db.query(JobModel).options(joinedload(JobModel.reviewer)).get(job_id)
+    job = db.query(JobModel).options(joinedload(JobModel.department), joinedload(JobModel.reviewer)).get(job_id)
     job = _ensure_job_access(job, current_admin)
     return _to_job_response(job)
 

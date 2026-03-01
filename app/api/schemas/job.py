@@ -24,4 +24,5 @@ class JobInDBBase(JobBase):
 
 
 class Job(JobInDBBase):
+    department_name: str | None = None
     reviewer_name: str | None = None
