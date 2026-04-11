@@ -5,6 +5,7 @@ from typing import Any, Dict
 import jwt
 
 from app.core.config import get_settings
+from app.models.enums import UserRole
 
 
 def hash_password(password: str) -> str:
@@ -15,12 +16,13 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hash_password(password) == password_hash
 
 
-def create_access_token(admin_id: int, email: str) -> str:
+def create_access_token(user_id: int, email: str | None, role: str | UserRole) -> str:
     settings = get_settings()
     expire = datetime.now(tz=timezone.utc) + timedelta(minutes=settings.access_token_exp_minutes)
     payload = {
-        "sub": str(admin_id),
+        "sub": str(user_id),
         "email": email,
+        "role": role.value if isinstance(role, UserRole) else role,
         "exp": expire,
     }
     token = jwt.encode(payload, settings.auth_secret, algorithm="HS256")

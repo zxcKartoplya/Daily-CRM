@@ -1,5 +1,9 @@
 from app.models.admin import Admin  # noqa: F401
+from app.models.daily_report import DailyReport  # noqa: F401
 from app.models.department import Department  # noqa: F401
+from app.models.employee_profile import EmployeeProfile  # noqa: F401
+from app.models.employee_settings import EmployeeSettings  # noqa: F401
+from app.models.internal_chat_message import InternalChatMessage  # noqa: F401
 from app.models.job import Job  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.task import Task  # noqa: F401

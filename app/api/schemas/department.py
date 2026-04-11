@@ -9,19 +9,16 @@ class DepartmentCreate(DepartmentBase):
     pass
 
 
-class DepartmentUpdate(DepartmentBase):
-    pass
+class DepartmentUpdate(BaseModel):
+    name: str | None = None
 
 
 class DepartmentInDBBase(DepartmentBase):
     id: int
-    admin_id: int
 
     class Config:
         from_attributes = True
 
 
 class Department(DepartmentInDBBase):
-    admin_name: str
     employees_count: int
-    jobs_count: int

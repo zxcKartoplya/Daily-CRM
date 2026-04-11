@@ -7,7 +7,7 @@ from app.api.routes import router as api_router
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Daily CRM Backend",
-        description="FastAPI backend for daily CRM with GigaChat integration",
+        description="Employee and admin backend for daily reports, statistics, and analytics",
         version="0.1.0",
     )
 
