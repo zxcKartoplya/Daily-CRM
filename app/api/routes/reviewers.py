@@ -5,7 +5,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.dependencies import require_admin
+from app.api.dependencies import require_admin_user
 from app.api.schemas.reviewer import (
     Reviewer,
     ReviewerCreate,
@@ -20,7 +20,7 @@ from app.models import Job as JobModel
 from app.services.gigachat import GigaChatClient
 
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_admin_user)])
 
 
 def _to_reviewer_with_jobs(reviewer: ReviewerModel) -> ReviewerWithJobs:

@@ -3,18 +3,18 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.dependencies import require_admin
+from app.api.dependencies import require_admin_user
 from app.api.schemas.job import Job, JobCreate, JobUpdate
 from app.db.session import get_db
 from app.models import (
     Job as JobModel,
     Department as DepartmentModel,
-    Admin as AdminModel,
     Reviewer as ReviewerModel,
+    User as UserModel,
 )
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin_user)])
 
 
 def _to_job_response(job: JobModel) -> Job:
@@ -29,13 +29,14 @@ def _to_job_response(job: JobModel) -> Job:
     )
 
 
-def _ensure_department_access(department: DepartmentModel | None, current_admin: AdminModel) -> None:
-    if not department or department.admin_id != current_admin.id:
+def _ensure_department_exists(department: DepartmentModel | None) -> DepartmentModel:
+    if not department:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+    return department
 
 
-def _ensure_job_access(job: JobModel | None, current_admin: AdminModel) -> JobModel:
-    if not job or job.department.admin_id != current_admin.id:
+def _ensure_job_exists(job: JobModel | None) -> JobModel:
+    if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return job
 
@@ -62,13 +63,11 @@ def _resolve_reviewer_id(db: Session, reviewer_id: int | None) -> int | None:
 @router.get("", response_model=List[Job])
 def list_jobs(
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> List[Job]:
     jobs = (
         db.query(JobModel)
         .options(joinedload(JobModel.department), joinedload(JobModel.reviewer))
-        .join(JobModel.department)
-        .filter(DepartmentModel.admin_id == current_admin.id)
+        .order_by(JobModel.name.asc())
         .all()
     )
     return [_to_job_response(job) for job in jobs]
@@ -78,10 +77,9 @@ def list_jobs(
 def get_job(
     job_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Job:
     job = db.query(JobModel).options(joinedload(JobModel.department), joinedload(JobModel.reviewer)).get(job_id)
-    job = _ensure_job_access(job, current_admin)
+    job = _ensure_job_exists(job)
     return _to_job_response(job)
 
 
@@ -89,10 +87,9 @@ def get_job(
 def create_job(
     payload: JobCreate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Job:
     department = db.query(DepartmentModel).get(payload.department_id)
-    _ensure_department_access(department, current_admin)
+    _ensure_department_exists(department)
     reviewer_id = _resolve_reviewer_id(db, payload.reviewer_id)
 
     job_data = payload.dict()
@@ -109,14 +106,13 @@ def update_job(
     job_id: int,
     payload: JobUpdate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Job:
     job = db.query(JobModel).get(job_id)
-    _ensure_job_access(job, current_admin)
+    job = _ensure_job_exists(job)
 
     if payload.department_id != job.department_id:
         department = db.query(DepartmentModel).get(payload.department_id)
-        _ensure_department_access(department, current_admin)
+        _ensure_department_exists(department)
     reviewer_id = _resolve_reviewer_id(db, payload.reviewer_id)
 
     update_data = payload.dict()
@@ -133,10 +129,9 @@ def update_job(
 def delete_job(
     job_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> None:
     job = db.query(JobModel).get(job_id)
-    job = _ensure_job_access(job, current_admin)
+    job = _ensure_job_exists(job)
 
     db.delete(job)
     db.commit()

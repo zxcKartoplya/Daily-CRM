@@ -11,8 +11,8 @@ from app.api.routes import (
     employee_settings,
     employee_statistics,
     internal_chat,
+    jobs,
     reviewers,
-	jobs
 )
 
 
@@ -41,6 +41,7 @@ router.include_router(
     tags=["admin-departments"],
     include_in_schema=True,
 )
+router.include_router(jobs.router, prefix="/admin/jobs", tags=["admin-jobs"], include_in_schema=True)
 router.include_router(admin_reports.router, prefix="/admin/reports", tags=["admin-reports"], include_in_schema=True)
 router.include_router(
     admin_analytics.router,
@@ -48,5 +49,9 @@ router.include_router(
     tags=["admin-analytics"],
     include_in_schema=True,
 )
-router.include_router(reviewers.router, prefix="/reviewers", tags=["reviewers"], include_in_schema=True)
-router.include_router(jobs.router, prefix='/jobs', tags=['jobs'], include_in_schema=True)
+router.include_router(
+    reviewers.router,
+    prefix="/admin/reviewers",
+    tags=["admin-reviewers"],
+    include_in_schema=True,
+)
