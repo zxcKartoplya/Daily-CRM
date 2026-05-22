@@ -5,6 +5,7 @@ from app.api.routes import (
     admin_departments,
     admin_reports,
     admin_users,
+    admin_workers,
     auth,
     employee_daily_reports,
     employee_profile,
