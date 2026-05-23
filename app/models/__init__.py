@@ -1,4 +1,3 @@
-from app.models.admin import Admin  # noqa: F401
 from app.models.daily_report import DailyReport  # noqa: F401
 from app.models.department import Department  # noqa: F401
 from app.models.employee_profile import EmployeeProfile  # noqa: F401

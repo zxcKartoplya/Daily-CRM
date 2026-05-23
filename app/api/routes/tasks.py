@@ -1,69 +1,56 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_admin
+from app.api.dependencies import require_admin_user
 from app.api.schemas.task import Task, TaskCreate, TaskUpdate
 from app.db.session import get_db
-from app.models import (
-    Task as TaskModel,
-    User as UserModel,
-    Job as JobModel,
-    Department as DepartmentModel,
-    Admin as AdminModel,
-)
+from app.models import Task as TaskModel
+from app.models import User as UserModel
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin_user)])
 
 
-def _ensure_user_access(user: UserModel | None, current_admin: AdminModel) -> UserModel:
-    if not user or user.job.department.admin_id != current_admin.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
-
-
-def _ensure_task_access(task: TaskModel | None, current_admin: AdminModel) -> TaskModel:
-    if not task or task.user.job.department.admin_id != current_admin.id:
+def _get_task_or_404(db: Session, task_id: int) -> TaskModel:
+    task = db.get(TaskModel, task_id)
+    if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return task
 
 
+def _ensure_worker_exists(db: Session, user_id: int) -> None:
+    user = db.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
+
+
 @router.get("", response_model=List[Task])
 def list_tasks(
+    user_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> List[Task]:
-    return (
-        db.query(TaskModel)
-        .join(TaskModel.user)
-        .join(UserModel.job)
-        .join(JobModel.department)
-        .filter(DepartmentModel.admin_id == current_admin.id)
-        .all()
-    )
+    query = db.query(TaskModel).order_by(TaskModel.date.desc())
+    if user_id is not None:
+        query = query.filter(TaskModel.user_id == user_id)
+    return query.all()
 
 
 @router.get("/{task_id}", response_model=Task)
 def get_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Task:
-    task = db.query(TaskModel).get(task_id)
-    return _ensure_task_access(task, current_admin)
+    return _get_task_or_404(db, task_id)
 
 
 @router.post("", response_model=Task, status_code=status.HTTP_201_CREATED)
 def create_task(
     payload: TaskCreate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Task:
-    user = db.query(UserModel).get(payload.user_id)
-    _ensure_user_access(user, current_admin)
-
+    _ensure_worker_exists(db, payload.user_id)
     task = TaskModel(**payload.dict())
     db.add(task)
     db.commit()
@@ -76,18 +63,12 @@ def update_task(
     task_id: int,
     payload: TaskUpdate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Task:
-    task = db.query(TaskModel).get(task_id)
-    task = _ensure_task_access(task, current_admin)
-
+    task = _get_task_or_404(db, task_id)
     if payload.user_id != task.user_id:
-        user = db.query(UserModel).get(payload.user_id)
-        _ensure_user_access(user, current_admin)
-
+        _ensure_worker_exists(db, payload.user_id)
     for field, value in payload.dict().items():
         setattr(task, field, value)
-
     db.commit()
     db.refresh(task)
     return task
@@ -97,10 +78,7 @@ def update_task(
 def delete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> None:
-    task = db.query(TaskModel).get(task_id)
-    task = _ensure_task_access(task, current_admin)
-
+    task = _get_task_or_404(db, task_id)
     db.delete(task)
     db.commit()

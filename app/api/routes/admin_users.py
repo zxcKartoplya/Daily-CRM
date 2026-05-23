@@ -49,6 +49,17 @@ def _ensure_job(db: Session, job_id: int | None) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
 
+def _validate_job_department(db: Session, job_id: int | None, department_id: int | None) -> None:
+    if job_id is None or department_id is None:
+        return
+    job = db.get(JobModel, job_id)
+    if job and job.department_id != department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job does not belong to the specified department",
+        )
+
+
 @router.get("", response_model=List[User])
 def list_admin_users(
     role: str | None = Query(default=None),
@@ -90,6 +101,7 @@ def create_admin_user(
 
     _ensure_department(db, payload.department_id)
     _ensure_job(db, payload.job_id)
+    _validate_job_department(db, payload.job_id, payload.department_id)
 
     user = UserModel(
         name=payload.name,
@@ -131,6 +143,10 @@ def update_admin_user(
         _ensure_department(db, update_data["department_id"])
     if "job_id" in update_data:
         _ensure_job(db, update_data["job_id"])
+
+    new_job_id = update_data.get("job_id", user.job_id)
+    new_dept_id = update_data.get("department_id", user.department_id)
+    _validate_job_department(db, new_job_id, new_dept_id)
 
     if "role" in update_data and update_data["role"] is not None:
         update_data["role"] = update_data["role"].value

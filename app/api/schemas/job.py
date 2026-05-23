@@ -5,7 +5,7 @@ class JobBase(BaseModel):
     name: str
     description: str | None = None
     department_id: int
-    reviewer_id: int | None = None
+    reviewer_id: int
 
 
 class JobCreate(JobBase):

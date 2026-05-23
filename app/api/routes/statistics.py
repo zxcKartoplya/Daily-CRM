@@ -1,69 +1,56 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_admin
+from app.api.dependencies import require_admin_user
 from app.api.schemas.statistic import Statistic, StatisticCreate, StatisticUpdate
 from app.db.session import get_db
-from app.models import (
-    Statistic as StatisticModel,
-    User as UserModel,
-    Job as JobModel,
-    Department as DepartmentModel,
-    Admin as AdminModel,
-)
+from app.models import Statistic as StatisticModel
+from app.models import User as UserModel
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin_user)])
 
 
-def _ensure_user_access(user: UserModel | None, current_admin: AdminModel) -> UserModel:
-    if not user or user.job.department.admin_id != current_admin.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
-
-
-def _ensure_statistic_access(statistic: StatisticModel | None, current_admin: AdminModel) -> StatisticModel:
-    if not statistic or statistic.user.job.department.admin_id != current_admin.id:
+def _get_statistic_or_404(db: Session, statistic_id: int) -> StatisticModel:
+    statistic = db.get(StatisticModel, statistic_id)
+    if not statistic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Statistic not found")
     return statistic
 
 
+def _ensure_worker_exists(db: Session, user_id: int) -> None:
+    user = db.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
+
+
 @router.get("", response_model=List[Statistic])
 def list_statistics(
+    user_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> List[Statistic]:
-    return (
-        db.query(StatisticModel)
-        .join(StatisticModel.user)
-        .join(UserModel.job)
-        .join(JobModel.department)
-        .filter(DepartmentModel.admin_id == current_admin.id)
-        .all()
-    )
+    query = db.query(StatisticModel).order_by(StatisticModel.date.desc())
+    if user_id is not None:
+        query = query.filter(StatisticModel.user_id == user_id)
+    return query.all()
 
 
 @router.get("/{statistic_id}", response_model=Statistic)
 def get_statistic(
     statistic_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Statistic:
-    statistic = db.query(StatisticModel).get(statistic_id)
-    return _ensure_statistic_access(statistic, current_admin)
+    return _get_statistic_or_404(db, statistic_id)
 
 
 @router.post("", response_model=Statistic, status_code=status.HTTP_201_CREATED)
 def create_statistic(
     payload: StatisticCreate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Statistic:
-    user = db.query(UserModel).get(payload.user_id)
-    _ensure_user_access(user, current_admin)
-
+    _ensure_worker_exists(db, payload.user_id)
     statistic = StatisticModel(**payload.dict())
     db.add(statistic)
     db.commit()
@@ -76,18 +63,12 @@ def update_statistic(
     statistic_id: int,
     payload: StatisticUpdate,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> Statistic:
-    statistic = db.query(StatisticModel).get(statistic_id)
-    statistic = _ensure_statistic_access(statistic, current_admin)
-
+    statistic = _get_statistic_or_404(db, statistic_id)
     if payload.user_id != statistic.user_id:
-        user = db.query(UserModel).get(payload.user_id)
-        _ensure_user_access(user, current_admin)
-
+        _ensure_worker_exists(db, payload.user_id)
     for field, value in payload.dict().items():
         setattr(statistic, field, value)
-
     db.commit()
     db.refresh(statistic)
     return statistic
@@ -97,10 +78,7 @@ def update_statistic(
 def delete_statistic(
     statistic_id: int,
     db: Session = Depends(get_db),
-    current_admin: AdminModel = Depends(require_admin),
 ) -> None:
-    statistic = db.query(StatisticModel).get(statistic_id)
-    statistic = _ensure_statistic_access(statistic, current_admin)
-
+    statistic = _get_statistic_or_404(db, statistic_id)
     db.delete(statistic)
     db.commit()

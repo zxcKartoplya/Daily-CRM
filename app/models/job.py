@@ -11,8 +11,8 @@ class Job(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False)
-    reviewer_id = Column(Integer, ForeignKey("reviewers.id", ondelete="SET NULL"), nullable=True)
+    reviewer_id = Column(Integer, ForeignKey("reviewers.id", ondelete="RESTRICT"), nullable=False)
 
     department = relationship("Department", back_populates="jobs")
     reviewer = relationship("Reviewer", back_populates="jobs")
-    users = relationship("User", back_populates="job", cascade="all, delete-orphan")
+    users = relationship("User", back_populates="job")
