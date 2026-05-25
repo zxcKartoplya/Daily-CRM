@@ -132,7 +132,7 @@ def upgrade() -> None:
     op.execute(
         """
         INSERT INTO employee_settings (user_id, reminder_enabled)
-        SELECT users.id, 1
+        SELECT users.id, true
         FROM users
         WHERE users.role = 'employee'
         """
