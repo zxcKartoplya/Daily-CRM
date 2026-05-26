@@ -2,7 +2,7 @@ from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_employee_user
 from app.api.schemas.daily_report import DailyReportUpdate
@@ -24,6 +24,7 @@ def list_internal_chat_messages(
 ) -> List[InternalChatMessage]:
     return (
         db.query(InternalChatMessageModel)
+        .options(joinedload(InternalChatMessageModel.daily_report))  # ← добавь
         .filter(InternalChatMessageModel.user_id == current_user.id)
         .order_by(InternalChatMessageModel.created_at.desc())
         .all()
@@ -90,4 +91,6 @@ def create_internal_chat_message(
 
     db.commit()
     db.refresh(message)
+    if message.daily_report_id:
+        db.refresh(message, attribute_names=['daily_report'])
     return message
