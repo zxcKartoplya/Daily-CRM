@@ -17,7 +17,10 @@ def create_app() -> FastAPI:
             "http://localhost:3000",
             "http://localhost:3001",
             "http://127.0.0.1:3000",
-            "http://178.253.45.236:3000"
+            "http://178.253.45.236:3000",
+            "http://45.90.216.186:3000",
+            "http://45.90.216.186:3001",
+            "http://45.90.216.186:8000"
         ],
         allow_credentials=True,
         allow_methods=["*"],
