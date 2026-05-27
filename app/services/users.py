@@ -50,7 +50,7 @@ def serialize_user(user: UserModel) -> User:
 
 def serialize_user_detail(user: UserModel) -> UserDetail:
     return UserDetail(
-        **serialize_user(user).dict(),
+        **serialize_user(user).model_dump(),
         profile=user.profile,
         settings=user.settings,
     )

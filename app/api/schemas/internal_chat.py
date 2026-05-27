@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.api.schemas.daily_report import DailyReport, DailyReportCreate
 
@@ -23,5 +23,4 @@ class InternalChatMessage(BaseModel):
     daily_report_id: int | None = None
     daily_report: DailyReport | None = None   # ← ДОБАВЬ
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class AdminBase(BaseModel):
@@ -18,8 +18,7 @@ class AdminUpdate(BaseModel):
 class Admin(AdminBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminLoginRequest(BaseModel):

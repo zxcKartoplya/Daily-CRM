@@ -29,7 +29,7 @@ def update_employee_profile(
     current_user: UserModel = Depends(require_employee_user),
 ) -> EmployeeProfile:
     profile = ensure_employee_profile(db, current_user)
-    for field, value in payload.dict(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
     db.commit()
     db.refresh(profile)

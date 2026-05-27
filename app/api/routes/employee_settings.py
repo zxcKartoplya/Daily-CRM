@@ -29,7 +29,7 @@ def update_employee_settings(
     current_user: UserModel = Depends(require_employee_user),
 ) -> EmployeeSettings:
     settings = ensure_employee_settings(db, current_user)
-    for field, value in payload.dict(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(settings, field, value)
     db.commit()
     db.refresh(settings)

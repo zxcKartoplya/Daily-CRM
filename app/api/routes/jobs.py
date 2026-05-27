@@ -92,7 +92,7 @@ def create_job(
     _ensure_department_exists(department)
     reviewer_id = _resolve_reviewer_id(db, payload.reviewer_id)
 
-    job_data = payload.dict()
+    job_data = payload.model_dump()
     job_data["reviewer_id"] = reviewer_id
     job = JobModel(**job_data)
     db.add(job)
@@ -115,7 +115,7 @@ def update_job(
         _ensure_department_exists(department)
     reviewer_id = _resolve_reviewer_id(db, payload.reviewer_id)
 
-    update_data = payload.dict()
+    update_data = payload.model_dump()
     update_data["reviewer_id"] = reviewer_id
     for field, value in update_data.items():
         setattr(job, field, value)

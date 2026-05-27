@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class EmployeeProfileBase(BaseModel):
@@ -15,5 +15,4 @@ class EmployeeProfileUpdate(EmployeeProfileBase):
 class EmployeeProfile(EmployeeProfileBase):
     user_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

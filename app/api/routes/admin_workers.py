@@ -98,7 +98,7 @@ def get_worker(
     db.commit()
     db.refresh(user)
     detail = serialize_user_detail(user)
-    return WorkerDetail(**detail.dict())
+    return WorkerDetail(**detail.model_dump())
 
 
 @router.post("", response_model=WorkerDetail, status_code=status.HTTP_201_CREATED)
@@ -132,7 +132,7 @@ def create_worker(
     db.commit()
     db.refresh(user)
     detail = serialize_user_detail(user)
-    return WorkerDetail(**detail.dict())
+    return WorkerDetail(**detail.model_dump())
 
 
 @router.put("/{worker_id}", response_model=WorkerDetail)
@@ -142,7 +142,7 @@ def update_worker(
     db: Session = Depends(get_db),
 ) -> WorkerDetail:
     user = _get_worker_or_404(db, worker_id)
-    update_data = payload.dict(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True)
 
     if "email" in update_data and update_data["email"] is not None:
         duplicate = (
@@ -180,7 +180,7 @@ def update_worker(
     db.commit()
     db.refresh(user)
     detail = serialize_user_detail(user)
-    return WorkerDetail(**detail.dict())
+    return WorkerDetail(**detail.model_dump())
 
 
 @router.delete("/{worker_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -70,7 +70,7 @@ def get_reviewer(reviewer_id: int, db: Session = Depends(get_db)) -> ReviewerWit
 
 @router.post("", response_model=Reviewer, status_code=status.HTTP_201_CREATED)
 def create_reviewer(payload: ReviewerCreate, db: Session = Depends(get_db)) -> Reviewer:
-    reviewer = ReviewerModel(**payload.dict())
+    reviewer = ReviewerModel(**payload.model_dump())
     db.add(reviewer)
     db.commit()
     db.refresh(reviewer)
@@ -85,7 +85,7 @@ def update_reviewer(
     if not reviewer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
 
-    for field, value in payload.dict().items():
+    for field, value in payload.model_dump().items():
         setattr(reviewer, field, value)
 
     db.commit()

@@ -10,9 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libpq-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt requirements-test.txt ./
 RUN pip install --user --no-cache-dir -r requirements.txt \
-    && pip install --user --no-cache-dir "psycopg2-binary>=2.9"
+    && pip install --user --no-cache-dir "psycopg2-binary>=2.9" \
+    && pip install --user --no-cache-dir -r requirements-test.txt
+
+FROM builder AS tester
+COPY . .
+ENV DATABASE_URL=sqlite:///:memory: \
+    AUTH_SECRET=ci-test-secret
+CMD ["python", "-m", "pytest", "tests/", "-v", "--tb=short", "--junit-xml=/tmp/test-results.xml"]
 
 FROM python:3.12-slim AS runtime
 

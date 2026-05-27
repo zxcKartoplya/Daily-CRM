@@ -51,7 +51,7 @@ def create_statistic(
     db: Session = Depends(get_db),
 ) -> Statistic:
     _ensure_worker_exists(db, payload.user_id)
-    statistic = StatisticModel(**payload.dict())
+    statistic = StatisticModel(**payload.model_dump())
     db.add(statistic)
     db.commit()
     db.refresh(statistic)
@@ -67,7 +67,7 @@ def update_statistic(
     statistic = _get_statistic_or_404(db, statistic_id)
     if payload.user_id != statistic.user_id:
         _ensure_worker_exists(db, payload.user_id)
-    for field, value in payload.dict().items():
+    for field, value in payload.model_dump().items():
         setattr(statistic, field, value)
     db.commit()
     db.refresh(statistic)

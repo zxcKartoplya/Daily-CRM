@@ -95,7 +95,7 @@ def update_admin_department(
     _: UserModel = Depends(require_admin_user),
 ) -> Department:
     department = _get_department_or_404(db, department_id)
-    for field, value in payload.dict(exclude_unset=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(department, field, value)
     db.commit()
     db.refresh(department)

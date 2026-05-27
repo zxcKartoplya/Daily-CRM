@@ -51,7 +51,7 @@ def create_task(
     db: Session = Depends(get_db),
 ) -> Task:
     _ensure_worker_exists(db, payload.user_id)
-    task = TaskModel(**payload.dict())
+    task = TaskModel(**payload.model_dump())
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -67,7 +67,7 @@ def update_task(
     task = _get_task_or_404(db, task_id)
     if payload.user_id != task.user_id:
         _ensure_worker_exists(db, payload.user_id)
-    for field, value in payload.dict().items():
+    for field, value in payload.model_dump().items():
         setattr(task, field, value)
     db.commit()
     db.refresh(task)

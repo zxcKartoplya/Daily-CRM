@@ -128,7 +128,7 @@ def update_admin_user(
     current_admin: UserModel = Depends(require_admin_user),
 ) -> UserDetail:
     user = _get_user_or_404(db, user_id)
-    update_data = payload.dict(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True)
 
     if "email" in update_data and update_data["email"] is not None:
         duplicate = (

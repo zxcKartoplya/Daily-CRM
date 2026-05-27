@@ -29,6 +29,23 @@ pipeline {
             }
         }
 
+        stage('Test') {
+            steps {
+                sh """
+                    docker build --target tester \
+                      -t ${REGISTRY}/${IMAGE_NAME}:test-${BUILD_NUMBER} \
+                      .
+                    docker run --rm \
+                      ${REGISTRY}/${IMAGE_NAME}:test-${BUILD_NUMBER}
+                """
+            }
+            post {
+                always {
+                    sh "docker rmi ${REGISTRY}/${IMAGE_NAME}:test-${BUILD_NUMBER} || true"
+                }
+            }
+        }
+
         stage('Push') {
             steps {
                 sh """

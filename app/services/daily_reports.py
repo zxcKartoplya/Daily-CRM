@@ -51,7 +51,7 @@ def create_daily_report(
 
 
 def update_daily_report(report: DailyReportModel, payload: DailyReportUpdate, *, user: UserModel) -> DailyReportModel:
-    update_data = payload.dict(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True)
     if "status" in update_data and update_data["status"] is not None:
         update_data["status"] = update_data["status"].value
 
