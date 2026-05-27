@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.api.schemas.daily_report import DailyReportCreate
+from app.api.schemas.daily_report import DailyReport, DailyReportCreate
 
 
 class InternalChatDailyReportPayload(DailyReportCreate):
@@ -21,6 +21,7 @@ class InternalChatMessage(BaseModel):
     created_at: datetime
     parsed_to_daily_report: bool
     daily_report_id: int | None = None
+    daily_report: DailyReport | None = None   # ← ДОБАВЬ
 
     class Config:
         from_attributes = True

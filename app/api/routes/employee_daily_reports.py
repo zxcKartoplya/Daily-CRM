@@ -9,9 +9,8 @@ from app.api.schemas.daily_report import DailyReport, DailyReportCreate, DailyRe
 from app.db.session import get_db
 from app.models import DailyReport as DailyReportModel
 from app.models import User as UserModel
+from app.models import InternalChatMessage as InternalChatMessageModel
 from app.services.daily_reports import create_daily_report, update_daily_report
-
-
 router = APIRouter()
 
 
@@ -24,10 +23,10 @@ def _get_owned_report(db: Session, user_id: int, report_id: int) -> DailyReportM
 
 @router.get("", response_model=List[DailyReport])
 def list_employee_daily_reports(
-    date_from: date | None = Query(default=None),
-    date_to: date | None = Query(default=None),
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_employee_user),
+        date_from: date | None = Query(default=None),
+        date_to: date | None = Query(default=None),
+        db: Session = Depends(get_db),
+        current_user: UserModel = Depends(require_employee_user),
 ) -> List[DailyReport]:
     query = (
         db.query(DailyReportModel)
@@ -43,18 +42,18 @@ def list_employee_daily_reports(
 
 @router.get("/{report_id}", response_model=DailyReport)
 def get_employee_daily_report(
-    report_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_employee_user),
+        report_id: int,
+        db: Session = Depends(get_db),
+        current_user: UserModel = Depends(require_employee_user),
 ) -> DailyReport:
     return _get_owned_report(db, current_user.id, report_id)
 
 
 @router.post("", response_model=DailyReport, status_code=status.HTTP_201_CREATED)
 def create_employee_daily_report(
-    payload: DailyReportCreate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_employee_user),
+        payload: DailyReportCreate,
+        db: Session = Depends(get_db),
+        current_user: UserModel = Depends(require_employee_user),
 ) -> DailyReport:
     report = create_daily_report(db, user=current_user, payload=payload)
     db.commit()
@@ -64,10 +63,10 @@ def create_employee_daily_report(
 
 @router.put("/{report_id}", response_model=DailyReport)
 def update_employee_daily_report(
-    report_id: int,
-    payload: DailyReportUpdate,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_employee_user),
+        report_id: int,
+        payload: DailyReportUpdate,
+        db: Session = Depends(get_db),
+        current_user: UserModel = Depends(require_employee_user),
 ) -> DailyReport:
     report = _get_owned_report(db, current_user.id, report_id)
 

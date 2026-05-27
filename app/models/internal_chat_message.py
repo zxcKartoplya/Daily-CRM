@@ -18,3 +18,4 @@ class InternalChatMessage(Base):
 
     user = relationship("User", back_populates="internal_chat_messages")
     daily_report = relationship("DailyReport", back_populates="internal_chat_messages")
+
