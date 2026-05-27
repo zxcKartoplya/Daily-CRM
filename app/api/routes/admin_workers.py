@@ -204,6 +204,22 @@ def get_worker_ai_feedback(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
+    total_reports_count = (
+        db.query(DailyReportModel)
+        .filter(DailyReportModel.user_id == worker_id)
+        .count()
+    )
+
+    if total_reports_count == 0:
+        return WorkerAIFeedback(
+            worker_id=worker_id,
+            worker_name=user.name,
+            feedback=(
+                f"У сотрудника «{user.name}» нет ни одного дейли-отчёта. "
+                f"Оценка невозможна — недостаточно данных для анализа."
+            ),
+        )
+
     since = date.today() - timedelta(days=29)
     reports = (
         db.query(DailyReportModel)
@@ -254,20 +270,30 @@ def get_worker_ai_feedback(
         vals = ", ".join(str(s.value) for s in statistics[:10])
         stats_text = f"\nЧисловые показатели (последние {len(statistics)} дней): {vals}"
 
+    no_recent_reports_note = (
+        "ВАЖНО: за последние 30 дней дейли-отчётов нет. "
+        "Обязательно укажи это как критичную проблему.\n"
+        if not reports else ""
+    )
+
     prompt = (
-        f"Ты — HR-аналитик. Дай краткую оценку сотрудника на основе данных ниже. "
-        f"Ответ должен быть на русском языке, 3-5 предложений. "
-        f"Укажи сильные стороны и зоны роста. Не используй markdown.\n\n"
+        f"Ты — HR-аналитик. Дай краткую оценку сотрудника строго на основе его дейли-отчётов. "
+        f"Ответ должен быть на русском языке, 3-5 предложений. Не используй markdown. "
+        f"Главный критерий оценки — количество и содержание дейли-отчётов. "
+        f"Если отчётов мало или их нет за период — это главный негативный фактор, укажи его первым. "
+        f"Не делай положительных выводов при нехватке данных.\n\n"
+        f"{no_recent_reports_note}"
         f"Сотрудник: {user.name}\n"
         f"Должность: {user.job.name if user.job else 'не указана'}\n"
         f"Отдел: {user.department.name if user.department else 'не указан'}\n"
-        f"Заполняемость отчётов за 30 дней: {completion_rate}%\n"
+        f"Всего отчётов за всё время: {total_reports_count}\n"
+        f"Заполняемость за последние 30 дней: {completion_rate}% ({len(reports)} из 30)\n"
         f"Средняя самооценка: {avg_rating if avg_rating is not None else 'нет данных'}/10\n"
         f"Блокеры: {blockers_count} раз(а)\n"
         f"Просил помощи: {needs_help_count} раз(а)\n"
         f"{stats_text}"
         f"{metrics_text}\n\n"
-        f"Последние отчёты:\n{reports_text if reports_text else 'Отчётов за период нет.'}"
+        f"Последние отчёты:\n{reports_text if reports_text else 'Отчётов за последние 30 дней нет.'}"
     )
 
     try:
