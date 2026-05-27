@@ -1,16 +1,20 @@
+from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.worker import Worker, WorkerCreate, WorkerDetail, WorkerUpdate
+from app.api.schemas.worker import Worker, WorkerAIFeedback, WorkerCreate, WorkerDetail, WorkerUpdate
 from app.core.security import hash_password
 from app.db.session import get_db
+from app.models import DailyReport as DailyReportModel
 from app.models import Department as DepartmentModel
 from app.models import Job as JobModel
+from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
+from app.services.gigachat import GigaChatClient
 from app.services.users import ensure_employee_context, serialize_user_detail
 
 
@@ -181,6 +185,102 @@ def update_worker(
     db.refresh(user)
     detail = serialize_user_detail(user)
     return WorkerDetail(**detail.model_dump())
+
+
+@router.post("/{worker_id}/ai-feedback", response_model=WorkerAIFeedback)
+def get_worker_ai_feedback(
+    worker_id: int,
+    db: Session = Depends(get_db),
+) -> WorkerAIFeedback:
+    user = (
+        db.query(UserModel)
+        .options(
+            joinedload(UserModel.department),
+            joinedload(UserModel.job).joinedload(JobModel.reviewer),
+        )
+        .filter(UserModel.id == worker_id, UserModel.role == UserRole.EMPLOYEE.value)
+        .first()
+    )
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
+
+    since = date.today() - timedelta(days=29)
+    reports = (
+        db.query(DailyReportModel)
+        .filter(DailyReportModel.user_id == worker_id, DailyReportModel.report_date >= since)
+        .order_by(DailyReportModel.report_date.desc())
+        .limit(10)
+        .all()
+    )
+    statistics = (
+        db.query(StatisticModel)
+        .filter(StatisticModel.user_id == worker_id, StatisticModel.date >= since)
+        .order_by(StatisticModel.date.desc())
+        .all()
+    )
+
+    ratings = [r.self_rating for r in reports if r.self_rating is not None]
+    avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
+    needs_help_count = sum(1 for r in reports if r.needs_help)
+    blockers_count = sum(1 for r in reports if r.blockers_text and r.blockers_text.strip())
+    completion_rate = round(len(reports) / 30 * 100)
+
+    reviewer = user.job.reviewer if user.job else None
+    metrics_text = ""
+    if reviewer and reviewer.metrics:
+        metric_lines = [
+            f"- {m.get('display_name', m.get('json_name', ''))}: {m.get('description', '')}"
+            for m in reviewer.metrics
+        ]
+        metrics_text = f"\nКритерии оценщика «{reviewer.name}»:\n" + "\n".join(metric_lines)
+
+    reports_text = ""
+    for r in reports[:5]:
+        parts = [f"Дата: {r.report_date}"]
+        if r.self_rating is not None:
+            parts.append(f"Самооценка: {r.self_rating}/10")
+        if r.mood:
+            parts.append(f"Настроение: {r.mood}")
+        if r.needs_help:
+            parts.append("Нужна помощь: да")
+        if r.yesterday_text:
+            parts.append(f"Вчера: {r.yesterday_text[:200]}")
+        if r.blockers_text:
+            parts.append(f"Блокеры: {r.blockers_text[:150]}")
+        reports_text += "\n".join(parts) + "\n\n"
+
+    stats_text = ""
+    if statistics:
+        vals = ", ".join(str(s.value) for s in statistics[:10])
+        stats_text = f"\nЧисловые показатели (последние {len(statistics)} дней): {vals}"
+
+    prompt = (
+        f"Ты — HR-аналитик. Дай краткую оценку сотрудника на основе данных ниже. "
+        f"Ответ должен быть на русском языке, 3-5 предложений. "
+        f"Укажи сильные стороны и зоны роста. Не используй markdown.\n\n"
+        f"Сотрудник: {user.name}\n"
+        f"Должность: {user.job.name if user.job else 'не указана'}\n"
+        f"Отдел: {user.department.name if user.department else 'не указан'}\n"
+        f"Заполняемость отчётов за 30 дней: {completion_rate}%\n"
+        f"Средняя самооценка: {avg_rating if avg_rating is not None else 'нет данных'}/10\n"
+        f"Блокеры: {blockers_count} раз(а)\n"
+        f"Просил помощи: {needs_help_count} раз(а)\n"
+        f"{stats_text}"
+        f"{metrics_text}\n\n"
+        f"Последние отчёты:\n{reports_text if reports_text else 'Отчётов за период нет.'}"
+    )
+
+    try:
+        client = GigaChatClient()
+        response = client.chat(prompt)
+        feedback = response["choices"][0]["message"]["content"]
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GigaChat unavailable: {exc}",
+        ) from exc
+
+    return WorkerAIFeedback(worker_id=worker_id, worker_name=user.name, feedback=feedback)
 
 
 @router.delete("/{worker_id}", status_code=status.HTTP_204_NO_CONTENT)

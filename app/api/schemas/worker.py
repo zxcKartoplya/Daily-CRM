@@ -42,3 +42,9 @@ class Worker(BaseModel):
 class WorkerDetail(Worker):
     profile: EmployeeProfile | None = None
     settings: EmployeeSettings | None = None
+
+
+class WorkerAIFeedback(BaseModel):
+    worker_id: int
+    worker_name: str
+    feedback: str
