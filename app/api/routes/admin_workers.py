@@ -10,6 +10,7 @@ from app.core.security import hash_password
 from app.db.session import get_db
 from app.models import DailyReport as DailyReportModel
 from app.models import Department as DepartmentModel
+from app.models import InternalChatMessage as InternalChatMessageModel
 from app.models import Job as JobModel
 from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
@@ -204,23 +205,34 @@ def get_worker_ai_feedback(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
-    total_reports_count = (
-        db.query(DailyReportModel)
-        .filter(DailyReportModel.user_id == worker_id)
-        .count()
+    since = date.today() - timedelta(days=29)
+
+    chat_messages = (
+        db.query(InternalChatMessageModel)
+        .filter(
+            InternalChatMessageModel.user_id == worker_id,
+            InternalChatMessageModel.created_at >= since,
+        )
+        .order_by(InternalChatMessageModel.created_at.asc())
+        .limit(30)
+        .all()
     )
 
-    if total_reports_count == 0:
+    if not chat_messages:
         return WorkerAIFeedback(
             worker_id=worker_id,
             worker_name=user.name,
             feedback=(
-                f"У сотрудника «{user.name}» нет ни одного дейли-отчёта. "
+                f"У сотрудника «{user.name}» нет дейликов за последние 30 дней. "
                 f"Оценка невозможна — недостаточно данных для анализа."
             ),
         )
 
-    since = date.today() - timedelta(days=29)
+    chat_text = "\n".join(
+        f"[{msg.created_at.strftime('%d.%m.%Y %H:%M')}] {msg.message_text}"
+        for msg in chat_messages
+    )
+
     reports = (
         db.query(DailyReportModel)
         .filter(DailyReportModel.user_id == worker_id, DailyReportModel.report_date >= since)
@@ -235,12 +247,6 @@ def get_worker_ai_feedback(
         .all()
     )
 
-    ratings = [r.self_rating for r in reports if r.self_rating is not None]
-    avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
-    needs_help_count = sum(1 for r in reports if r.needs_help)
-    blockers_count = sum(1 for r in reports if r.blockers_text and r.blockers_text.strip())
-    completion_rate = round(len(reports) / 30 * 100)
-
     reviewer = user.job.reviewer if user.job else None
     metrics_text = ""
     if reviewer and reviewer.metrics:
@@ -250,50 +256,36 @@ def get_worker_ai_feedback(
         ]
         metrics_text = f"\nКритерии оценщика «{reviewer.name}»:\n" + "\n".join(metric_lines)
 
-    reports_text = ""
-    for r in reports[:5]:
-        parts = [f"Дата: {r.report_date}"]
-        if r.self_rating is not None:
-            parts.append(f"Самооценка: {r.self_rating}/10")
-        if r.mood:
-            parts.append(f"Настроение: {r.mood}")
-        if r.needs_help:
-            parts.append("Нужна помощь: да")
-        if r.yesterday_text:
-            parts.append(f"Вчера: {r.yesterday_text[:200]}")
-        if r.blockers_text:
-            parts.append(f"Блокеры: {r.blockers_text[:150]}")
-        reports_text += "\n".join(parts) + "\n\n"
-
     stats_text = ""
     if statistics:
         vals = ", ".join(str(s.value) for s in statistics[:10])
         stats_text = f"\nЧисловые показатели (последние {len(statistics)} дней): {vals}"
 
-    no_recent_reports_note = (
-        "ВАЖНО: за последние 30 дней дейли-отчётов нет. "
-        "Обязательно укажи это как критичную проблему.\n"
-        if not reports else ""
-    )
+    reports_supplement = ""
+    if reports:
+        ratings = [r.self_rating for r in reports if r.self_rating is not None]
+        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
+        needs_help_count = sum(1 for r in reports if r.needs_help)
+        blockers_count = sum(1 for r in reports if r.blockers_text and r.blockers_text.strip())
+        reports_supplement = (
+            f"\nДополнительно — формальные дейли-отчёты ({len(reports)} шт. за 30 дней):\n"
+            f"Средняя самооценка: {avg_rating if avg_rating is not None else 'нет данных'}/10\n"
+            f"Блокеры: {blockers_count} раз(а)\n"
+            f"Просил помощи: {needs_help_count} раз(а)\n"
+        )
 
     prompt = (
-        f"Ты — HR-аналитик. Дай краткую оценку сотрудника строго на основе его дейли-отчётов. "
+        f"Ты — HR-аналитик. Дай краткую оценку сотрудника строго на основе его дейликов из внутреннего чата. "
         f"Ответ должен быть на русском языке, 3-5 предложений. Не используй markdown. "
-        f"Главный критерий оценки — количество и содержание дейли-отчётов. "
-        f"Если отчётов мало или их нет за период — это главный негативный фактор, укажи его первым. "
-        f"Не делай положительных выводов при нехватке данных.\n\n"
-        f"{no_recent_reports_note}"
+        f"Главный и приоритетный источник данных — сообщения из внутреннего чата ниже. "
+        f"Если есть формальные отчёты — учитывай их только как дополнение.\n\n"
         f"Сотрудник: {user.name}\n"
         f"Должность: {user.job.name if user.job else 'не указана'}\n"
         f"Отдел: {user.department.name if user.department else 'не указан'}\n"
-        f"Всего отчётов за всё время: {total_reports_count}\n"
-        f"Заполняемость за последние 30 дней: {completion_rate}% ({len(reports)} из 30)\n"
-        f"Средняя самооценка: {avg_rating if avg_rating is not None else 'нет данных'}/10\n"
-        f"Блокеры: {blockers_count} раз(а)\n"
-        f"Просил помощи: {needs_help_count} раз(а)\n"
+        f"{metrics_text}"
         f"{stats_text}"
-        f"{metrics_text}\n\n"
-        f"Последние отчёты:\n{reports_text if reports_text else 'Отчётов за последние 30 дней нет.'}"
+        f"{reports_supplement}\n"
+        f"Дейлики из чата за последние 30 дней ({len(chat_messages)} сообщений):\n{chat_text}"
     )
 
     try:
