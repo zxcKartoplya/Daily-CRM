@@ -8,12 +8,12 @@ YESTERDAY = (date.today().replace(day=date.today().day - 1)).isoformat()
 def _report_payload(report_date: str = TODAY) -> dict:
     return {
         "report_date": report_date,
-        "yesterday_text": "Did some work",
-        "today_text": "Will do more work",
-        "blockers_text": None,
-        "mood": "good",
         "self_rating": 8,
         "needs_help": False,
+        "tasks": [
+            {"task_text": "Сделал задачу A", "slot": "done"},
+            {"task_text": "Планирую задачу B", "slot": "planned"},
+        ],
     }
 
 
@@ -43,7 +43,9 @@ class TestCreateDailyReport:
         data = response.json()
         assert data["report_date"] == TODAY
         assert data["user_id"] == employee_user.id
-        assert data["today_text"] == "Will do more work"
+        assert len(data["tasks"]) == 2
+        slots = {t["slot"] for t in data["tasks"]}
+        assert slots == {"done", "planned"}
 
     def test_duplicate_date_returns_400(self, client, employee_headers):
         client.post("/api/employee/daily-reports", headers=employee_headers, json=_report_payload())
@@ -68,6 +70,23 @@ class TestCreateDailyReport:
         )
         assert response.status_code == 403
 
+    def test_task_without_id_or_text_returns_422(self, client, employee_headers):
+        payload = _report_payload()
+        payload["tasks"] = [{"slot": "done"}]
+        response = client.post("/api/employee/daily-reports", headers=employee_headers, json=payload)
+        assert response.status_code == 422
+
+    def test_report_with_blocker(self, client, employee_headers):
+        payload = _report_payload()
+        payload["needs_help"] = True
+        payload["blocker_type"] = "technical"
+        payload["blockers_text"] = "Нет доступа к серверу"
+        response = client.post("/api/employee/daily-reports", headers=employee_headers, json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["needs_help"] is True
+        assert data["blocker_type"] == "technical"
+
 
 class TestGetDailyReport:
     def test_get_own_report(self, client, employee_headers):
@@ -86,11 +105,9 @@ class TestGetDailyReport:
         assert response.status_code == 404
 
     def test_employee_cannot_get_another_users_report(self, client, db, employee_headers):
-        from app.models import User
-        from app.models.enums import UserRole, UserStatus
-        from app.core.security import hash_password, create_access_token
-        from app.models import DailyReport
-        from app.models.enums import DailyReportSource, DailyReportStatus
+        from app.models import User, DailyReport
+        from app.models.enums import UserRole, UserStatus, DailyReportSource, DailyReportStatus
+        from app.core.security import hash_password
         from datetime import datetime
 
         other = User(
@@ -120,7 +137,7 @@ class TestGetDailyReport:
 
 
 class TestUpdateDailyReport:
-    def test_update_own_report(self, client, employee_headers):
+    def test_update_own_report_tasks(self, client, employee_headers):
         created = client.post(
             "/api/employee/daily-reports",
             headers=employee_headers,
@@ -130,10 +147,27 @@ class TestUpdateDailyReport:
         response = client.put(
             f"/api/employee/daily-reports/{created['id']}",
             headers=employee_headers,
-            json={"today_text": "Changed text"},
+            json={"tasks": [{"task_text": "Новая задача", "slot": "planned"}]},
         )
         assert response.status_code == 200
-        assert response.json()["today_text"] == "Changed text"
+        data = response.json()
+        assert len(data["tasks"]) == 1
+        assert data["tasks"][0]["task_text"] == "Новая задача"
+
+    def test_update_self_rating(self, client, employee_headers):
+        created = client.post(
+            "/api/employee/daily-reports",
+            headers=employee_headers,
+            json=_report_payload(),
+        ).json()
+
+        response = client.put(
+            f"/api/employee/daily-reports/{created['id']}",
+            headers=employee_headers,
+            json={"self_rating": 5},
+        )
+        assert response.status_code == 200
+        assert response.json()["self_rating"] == 5
 
     def test_update_date_to_existing_date_returns_400(self, client, employee_headers):
         client.post("/api/employee/daily-reports", headers=employee_headers, json=_report_payload(TODAY))

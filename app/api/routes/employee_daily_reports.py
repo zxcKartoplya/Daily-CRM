@@ -2,20 +2,25 @@ from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_employee_user
 from app.api.schemas.daily_report import DailyReport, DailyReportCreate, DailyReportUpdate
 from app.db.session import get_db
 from app.models import DailyReport as DailyReportModel
 from app.models import User as UserModel
-from app.models import InternalChatMessage as InternalChatMessageModel
 from app.services.daily_reports import create_daily_report, update_daily_report
+
 router = APIRouter()
 
 
 def _get_owned_report(db: Session, user_id: int, report_id: int) -> DailyReportModel:
-    report = db.get(DailyReportModel, report_id)
+    report = (
+        db.query(DailyReportModel)
+        .options(joinedload(DailyReportModel.tasks))
+        .filter(DailyReportModel.id == report_id)
+        .first()
+    )
     if not report or report.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily report not found")
     return report
@@ -30,6 +35,7 @@ def list_employee_daily_reports(
 ) -> List[DailyReport]:
     query = (
         db.query(DailyReportModel)
+        .options(joinedload(DailyReportModel.tasks))
         .filter(DailyReportModel.user_id == current_user.id)
         .order_by(DailyReportModel.report_date.desc())
     )
@@ -86,7 +92,7 @@ def update_employee_daily_report(
                 detail="Daily report for this date already exists",
             )
 
-    report = update_daily_report(report, payload, user=current_user)
+    report = update_daily_report(db, report, payload, user=current_user)
     db.commit()
     db.refresh(report)
     return report

@@ -24,3 +24,16 @@ class DailyReportStatus(str, Enum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
     IMPORTED = "imported"
+
+
+class BlockerType(str, Enum):
+    TECHNICAL = "technical"
+    PROCESS = "process"
+    EXTERNAL = "external"
+    PERSONAL = "personal"
+    OTHER = "other"
+
+
+class DailyReportTaskSlot(str, Enum):
+    DONE = "done"
+    PLANNED = "planned"

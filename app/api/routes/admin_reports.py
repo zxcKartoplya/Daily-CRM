@@ -28,7 +28,11 @@ def list_admin_reports(
 ) -> List[DailyReport]:
     query = (
         db.query(DailyReportModel)
-        .options(joinedload(DailyReportModel.user), joinedload(DailyReportModel.department))
+        .options(
+            joinedload(DailyReportModel.user),
+            joinedload(DailyReportModel.department),
+            joinedload(DailyReportModel.tasks),
+        )
         .order_by(DailyReportModel.report_date.desc(), DailyReportModel.submitted_at.desc())
     )
     if user_id is not None:
@@ -54,7 +58,12 @@ def get_admin_report(
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
 ) -> DailyReport:
-    report = db.get(DailyReportModel, report_id)
+    report = (
+        db.query(DailyReportModel)
+        .options(joinedload(DailyReportModel.tasks))
+        .filter(DailyReportModel.id == report_id)
+        .first()
+    )
     if not report:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily report not found")
     return report

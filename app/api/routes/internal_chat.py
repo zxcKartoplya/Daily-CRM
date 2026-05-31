@@ -24,7 +24,7 @@ def list_internal_chat_messages(
 ) -> List[InternalChatMessage]:
     return (
         db.query(InternalChatMessageModel)
-        .options(joinedload(InternalChatMessageModel.daily_report))  # ← добавь
+        .options(joinedload(InternalChatMessageModel.daily_report))
         .filter(InternalChatMessageModel.user_id == current_user.id)
         .order_by(InternalChatMessageModel.created_at.desc())
         .all()
@@ -56,34 +56,31 @@ def create_internal_chat_message(
         )
         if existing_report:
             report_update = DailyReportUpdate(
-                yesterday_text=payload.daily_report.yesterday_text,
-                today_text=payload.daily_report.today_text,
                 blockers_text=payload.daily_report.blockers_text,
-                mood=payload.daily_report.mood,
+                blocker_type=payload.daily_report.blocker_type,
                 self_rating=payload.daily_report.self_rating,
                 needs_help=payload.daily_report.needs_help,
                 status=payload.daily_report.status,
+                tasks=payload.daily_report.tasks if payload.daily_report.tasks else None,
             )
-            update_daily_report(existing_report, report_update, user=current_user)
+            update_daily_report(db, existing_report, report_update, user=current_user)
             report = existing_report
         else:
             report_payload = build_internal_chat_report_payload(
                 payload.message_text,
                 report_date=report_date,
             )
-            if payload.daily_report.yesterday_text is not None:
-                report_payload.yesterday_text = payload.daily_report.yesterday_text
-            if payload.daily_report.today_text is not None:
-                report_payload.today_text = payload.daily_report.today_text
             if payload.daily_report.blockers_text is not None:
                 report_payload.blockers_text = payload.daily_report.blockers_text
-            if payload.daily_report.mood is not None:
-                report_payload.mood = payload.daily_report.mood
+            if payload.daily_report.blocker_type is not None:
+                report_payload.blocker_type = payload.daily_report.blocker_type
             if payload.daily_report.self_rating is not None:
                 report_payload.self_rating = payload.daily_report.self_rating
             report_payload.needs_help = payload.daily_report.needs_help
             report_payload.source = payload.daily_report.source
             report_payload.status = payload.daily_report.status
+            if payload.daily_report.tasks:
+                report_payload.tasks = payload.daily_report.tasks
             report = create_daily_report(db, user=current_user, payload=report_payload)
 
         message.parsed_to_daily_report = True
