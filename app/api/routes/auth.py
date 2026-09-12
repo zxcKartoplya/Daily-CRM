@@ -41,9 +41,9 @@ def bootstrap_admin(payload: BootstrapAdminRequest, db: Session = Depends(get_db
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.query(UserModel).filter(UserModel.email == payload.email).first()
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Неверный логин или пароль")
     if user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not active")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь не активен")
 
     ensure_employee_context(db, user)
     db.commit()
