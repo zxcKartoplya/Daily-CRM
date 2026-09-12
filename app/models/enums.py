@@ -12,6 +12,14 @@ class UserStatus(str, Enum):
     INVITED = "invited"
 
 
+class ScheduleType(str, Enum):
+    WEEKLY = "weekly"
+    NONE = "none"
+
+
+DEFAULT_WORK_DAYS: list[int] = [1, 2, 3, 4, 5]
+
+
 class DailyReportSource(str, Enum):
     INTERNAL_WEB = "internal_web"
     TELEGRAM = "telegram"

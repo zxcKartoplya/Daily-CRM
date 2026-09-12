@@ -16,6 +16,7 @@ from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
 from app.services.gigachat import GigaChatClient
+from app.services.schedule import apply_schedule_update, schedule_for_new_user
 from app.services.users import ensure_employee_context, serialize_user_detail
 
 
@@ -72,6 +73,8 @@ def _serialize_worker(user: UserModel) -> Worker:
         department_name=user.department.name if user.department else None,
         job_id=user.job_id,
         status=user.status,
+        schedule_type=user.schedule_type,
+        work_days=user.work_days,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
@@ -122,6 +125,13 @@ def create_worker(
     _ensure_job(db, payload.job_id)
     _validate_job_department(db, payload.job_id, payload.department_id)
 
+    schedule_type, work_days = schedule_for_new_user(
+        db,
+        job_id=payload.job_id,
+        schedule_type=payload.schedule_type,
+        work_days=payload.work_days,
+    )
+
     user = UserModel(
         name=payload.name,
         email=payload.email,
@@ -130,6 +140,8 @@ def create_worker(
         department_id=payload.department_id,
         job_id=payload.job_id,
         status=payload.status.value,
+        schedule_type=schedule_type,
+        work_days=work_days,
     )
     db.add(user)
     db.flush()
@@ -177,6 +189,8 @@ def update_worker(
         password = update_data.pop("password")
         if password:
             user.password_hash = hash_password(password)
+
+    apply_schedule_update(user, update_data)
 
     for field, value in update_data.items():
         setattr(user, field, value)

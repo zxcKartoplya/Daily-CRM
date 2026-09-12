@@ -4,7 +4,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 
 from app.api.schemas.employee_profile import EmployeeProfile
 from app.api.schemas.employee_settings import EmployeeSettings
-from app.models.enums import UserStatus
+from app.models.enums import ScheduleType, UserStatus
 
 
 class WorkerCreate(BaseModel):
@@ -14,6 +14,8 @@ class WorkerCreate(BaseModel):
     department_id: int | None = None
     job_id: int | None = None
     status: UserStatus = UserStatus.ACTIVE
+    schedule_type: ScheduleType | None = None
+    work_days: list[int] | None = None
 
 
 class WorkerUpdate(BaseModel):
@@ -23,6 +25,8 @@ class WorkerUpdate(BaseModel):
     department_id: int | None = None
     job_id: int | None = None
     status: UserStatus | None = None
+    schedule_type: ScheduleType | None = None
+    work_days: list[int] | None = None
 
 
 class Worker(BaseModel):
@@ -33,6 +37,8 @@ class Worker(BaseModel):
     department_name: str | None = None
     job_id: int | None = None
     status: str
+    schedule_type: ScheduleType
+    work_days: list[int] | None = None
     created_at: datetime
     updated_at: datetime
 

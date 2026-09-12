@@ -12,6 +12,7 @@ from app.models import (
     Reviewer as ReviewerModel,
     User as UserModel,
 )
+from app.services.schedule import normalize_schedule
 
 
 router = APIRouter(dependencies=[Depends(require_admin_user)])
@@ -26,6 +27,8 @@ def _to_job_response(job: JobModel) -> Job:
         department_name=job.department.name if job.department else None,
         reviewer_id=job.reviewer_id,
         reviewer_name=job.reviewer.name if job.reviewer else None,
+        schedule_type=job.schedule_type,
+        work_days=job.work_days,
     )
 
 
@@ -94,6 +97,9 @@ def create_job(
 
     job_data = payload.model_dump()
     job_data["reviewer_id"] = reviewer_id
+    job_data["schedule_type"], job_data["work_days"] = normalize_schedule(
+        payload.schedule_type, payload.work_days
+    )
     job = JobModel(**job_data)
     db.add(job)
     db.commit()
@@ -117,6 +123,9 @@ def update_job(
 
     update_data = payload.model_dump()
     update_data["reviewer_id"] = reviewer_id
+    update_data["schedule_type"], update_data["work_days"] = normalize_schedule(
+        payload.schedule_type, payload.work_days
+    )
     for field, value in update_data.items():
         setattr(job, field, value)
 
