@@ -1,15 +1,23 @@
+from datetime import date, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
+from app.api.schemas.daily_entry import (
+    DepartmentDailies,
+    DepartmentDailyDay,
+    DepartmentDailyEmployee,
+)
 from app.api.schemas.department import Department, DepartmentCreate, DepartmentUpdate
 from app.db.session import get_db
-from app.models import DailyReport as DailyReportModel
+from app.models import DailyEntry as DailyEntryModel
 from app.models import Department as DepartmentModel
 from app.models import User as UserModel
+from app.models.enums import UserRole
+from app.services.schedule import is_working_day
 
 
 router = APIRouter()
@@ -112,12 +120,77 @@ def delete_admin_department(
     department = _get_department_or_404(db, department_id)
 
     has_users = db.query(UserModel).filter(UserModel.department_id == department.id).first() is not None
-    has_reports = db.query(DailyReportModel).filter(DailyReportModel.department_id == department.id).first() is not None
-    if has_users or has_reports or department.jobs:
+    has_entries = db.query(DailyEntryModel).filter(DailyEntryModel.department_id == department.id).first() is not None
+    if has_users or has_entries or department.jobs:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete department with related users, jobs, or reports",
+            detail="Cannot delete department with related users, jobs, or entries",
         )
 
     db.delete(department)
     db.commit()
+
+
+@router.get("/{department_id}/dailies", response_model=DepartmentDailies)
+def get_department_dailies(
+    department_id: int,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(require_admin_user),
+) -> DepartmentDailies:
+    department = _get_department_or_404(db, department_id)
+
+    period_end = date_to or date.today()
+    period_start = date_from or period_end - timedelta(days=6)
+    if period_start > period_end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_from не может быть позже date_to",
+        )
+
+    employees = (
+        db.query(UserModel)
+        .filter(UserModel.department_id == department_id, UserModel.role == UserRole.EMPLOYEE.value)
+        .order_by(UserModel.name.asc())
+        .all()
+    )
+    entries = (
+        db.query(DailyEntryModel)
+        .options(joinedload(DailyEntryModel.items))
+        .filter(
+            DailyEntryModel.user_id.in_([employee.id for employee in employees] or [0]),
+            DailyEntryModel.date >= period_start,
+            DailyEntryModel.date <= period_end,
+        )
+        .all()
+    )
+    by_user: dict[int, dict[date, DailyEntryModel]] = {}
+    for entry in entries:
+        by_user.setdefault(entry.user_id, {})[entry.date] = entry
+
+    period = [period_start + timedelta(days=offset) for offset in range((period_end - period_start).days + 1)]
+
+    return DepartmentDailies(
+        department_id=department.id,
+        department_name=department.name,
+        date_from=period_start,
+        date_to=period_end,
+        employees=[
+            DepartmentDailyEmployee(
+                user_id=employee.id,
+                user_name=employee.name,
+                schedule_type=employee.schedule_type,
+                work_days=employee.work_days,
+                days=[
+                    DepartmentDailyDay(
+                        date=day,
+                        is_working_day=is_working_day(employee, day),
+                        entry=by_user.get(employee.id, {}).get(day),
+                    )
+                    for day in period
+                ],
+            )
+            for employee in employees
+        ],
+    )

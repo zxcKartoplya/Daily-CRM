@@ -16,4 +16,4 @@ def get_employee_statistics(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_employee_user),
 ) -> EmployeeStatistics:
-    return calculate_employee_statistics(db, current_user.id)
+    return calculate_employee_statistics(db, current_user)

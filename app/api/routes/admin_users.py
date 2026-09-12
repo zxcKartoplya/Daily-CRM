@@ -11,6 +11,7 @@ from app.models import Department as DepartmentModel
 from app.models import Job as JobModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
+from app.services.schedule import apply_schedule_update, schedule_for_new_user
 from app.services.users import ensure_employee_context, serialize_user, serialize_user_detail
 
 
@@ -103,6 +104,13 @@ def create_admin_user(
     _ensure_job(db, payload.job_id)
     _validate_job_department(db, payload.job_id, payload.department_id)
 
+    schedule_type, work_days = schedule_for_new_user(
+        db,
+        job_id=payload.job_id,
+        schedule_type=payload.schedule_type,
+        work_days=payload.work_days,
+    )
+
     user = UserModel(
         name=payload.name,
         email=payload.email,
@@ -111,6 +119,8 @@ def create_admin_user(
         department_id=payload.department_id,
         status=payload.status.value,
         job_id=payload.job_id,
+        schedule_type=schedule_type,
+        work_days=work_days,
     )
     db.add(user)
     db.flush()
@@ -156,6 +166,8 @@ def update_admin_user(
         password = update_data.pop("password")
         if password:
             user.password_hash = hash_password(password)
+
+    apply_schedule_update(user, update_data)
 
     for field, value in update_data.items():
         setattr(user, field, value)

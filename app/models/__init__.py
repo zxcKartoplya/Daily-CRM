@@ -1,5 +1,5 @@
-from app.models.daily_report import DailyReport  # noqa: F401
-from app.models.daily_report_task import DailyReportTask  # noqa: F401
+from app.models.daily_entry import DailyEntry  # noqa: F401
+from app.models.entry_item import EntryItem  # noqa: F401
 from app.models.department import Department  # noqa: F401
 from app.models.employee_profile import EmployeeProfile  # noqa: F401
 from app.models.employee_settings import EmployeeSettings  # noqa: F401

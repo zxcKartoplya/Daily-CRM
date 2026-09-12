@@ -12,4 +12,4 @@ class Department(Base):
 
     jobs = relationship("Job", back_populates="department", cascade="all, delete-orphan")
     users = relationship("User", back_populates="department")
-    daily_reports = relationship("DailyReport", back_populates="department")
+    daily_entries = relationship("DailyEntry", back_populates="department")

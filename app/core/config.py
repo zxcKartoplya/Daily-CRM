@@ -15,6 +15,9 @@ class Settings:
         # По умолчанию используем SQLite в файле, чтобы проект запускался "из коробки"
         self.database_url: str = os.getenv("DATABASE_URL", "sqlite:///./daily_crm.db")
 
+        # Дейлики
+        self.daily_backfill_window_days: int = int(os.getenv("DAILY_BACKFILL_WINDOW_DAYS", "7"))
+
         # GigaChat
         self.gigachat_base_url: Optional[str] = os.getenv("GIGACHAT_BASE_URL")
         self.gigachat_oauth_url: Optional[str] = os.getenv("GIGACHAT_OAUTH_URL")

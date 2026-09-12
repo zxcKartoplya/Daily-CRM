@@ -43,6 +43,8 @@ def serialize_user(user: UserModel) -> User:
         department_name=user.department.name if user.department else None,
         status=user.status,
         job_id=user.job_id,
+        schedule_type=user.schedule_type,
+        work_days=user.work_days,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

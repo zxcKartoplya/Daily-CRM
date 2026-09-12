@@ -7,7 +7,7 @@ from app.api.routes import (
     admin_users,
     admin_workers,
     auth,
-    employee_daily_reports,
+    employee_daily,
     employee_profile,
     employee_settings,
     employee_statistics,
@@ -25,9 +25,15 @@ router.include_router(auth.router, prefix="/auth", tags=["auth"], include_in_sch
 router.include_router(employee_profile.router, prefix="/employee/profile", tags=["employee-profile"], include_in_schema=True)
 router.include_router(employee_settings.router, prefix="/employee/settings", tags=["employee-settings"], include_in_schema=True)
 router.include_router(
-    employee_daily_reports.router,
-    prefix="/employee/daily-reports",
-    tags=["employee-daily-reports"],
+    employee_daily.router,
+    prefix="/employee/daily",
+    tags=["employee-daily"],
+    include_in_schema=True,
+)
+router.include_router(
+    employee_daily.chains_router,
+    prefix="/employee/daily-chains",
+    tags=["employee-daily"],
     include_in_schema=True,
 )
 router.include_router(

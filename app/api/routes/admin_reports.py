@@ -5,65 +5,62 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.daily_report import DailyReport
+from app.api.schemas.daily_entry import DailyEntry
 from app.db.session import get_db
-from app.models import DailyReport as DailyReportModel
+from app.models import DailyEntry as DailyEntryModel
 from app.models import User as UserModel
 
 
 router = APIRouter()
 
 
-@router.get("", response_model=List[DailyReport])
-def list_admin_reports(
+@router.get("", response_model=List[DailyEntry])
+def list_admin_entries(
     user_id: int | None = Query(default=None),
     department_id: int | None = Query(default=None),
-    source: str | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
+    day_type: str | None = Query(default=None),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
-    needs_help: bool | None = Query(default=None),
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
-) -> List[DailyReport]:
+) -> List[DailyEntry]:
     query = (
-        db.query(DailyReportModel)
+        db.query(DailyEntryModel)
         .options(
-            joinedload(DailyReportModel.user),
-            joinedload(DailyReportModel.department),
-            joinedload(DailyReportModel.tasks),
+            joinedload(DailyEntryModel.user),
+            joinedload(DailyEntryModel.department),
+            joinedload(DailyEntryModel.items),
         )
-        .order_by(DailyReportModel.report_date.desc(), DailyReportModel.submitted_at.desc())
+        .order_by(DailyEntryModel.date.desc(), DailyEntryModel.id.desc())
     )
     if user_id is not None:
-        query = query.filter(DailyReportModel.user_id == user_id)
+        query = query.filter(DailyEntryModel.user_id == user_id)
     if department_id is not None:
-        query = query.filter(DailyReportModel.department_id == department_id)
-    if source is not None:
-        query = query.filter(DailyReportModel.source == source)
+        query = query.filter(DailyEntryModel.department_id == department_id)
     if status_filter is not None:
-        query = query.filter(DailyReportModel.status == status_filter)
+        query = query.filter(DailyEntryModel.status == status_filter)
+    if day_type is not None:
+        query = query.filter(DailyEntryModel.day_type == day_type)
     if date_from is not None:
-        query = query.filter(DailyReportModel.report_date >= date_from)
+        query = query.filter(DailyEntryModel.date >= date_from)
     if date_to is not None:
-        query = query.filter(DailyReportModel.report_date <= date_to)
-    if needs_help is not None:
-        query = query.filter(DailyReportModel.needs_help == needs_help)
+        query = query.filter(DailyEntryModel.date <= date_to)
     return query.all()
 
 
-@router.get("/{report_id}", response_model=DailyReport)
-def get_admin_report(
-    report_id: int,
+@router.get("/{entry_id}", response_model=DailyEntry)
+def get_admin_entry(
+    entry_id: int,
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
-) -> DailyReport:
-    report = (
-        db.query(DailyReportModel)
-        .options(joinedload(DailyReportModel.tasks))
-        .filter(DailyReportModel.id == report_id)
+) -> DailyEntry:
+    entry = (
+        db.query(DailyEntryModel)
+        .options(joinedload(DailyEntryModel.items))
+        .filter(DailyEntryModel.id == entry_id)
         .first()
     )
-    if not report:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily report not found")
-    return report
+    if not entry:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись дня не найдена")
+    return entry
