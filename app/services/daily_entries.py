@@ -7,8 +7,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.schemas.daily_entry import (
+    BulkDayTypeWrite,
     ChainHistory,
     ChainItem,
+    ChainPoint,
     DailyEntryWrite,
     DayView,
     EntryItemInput,
@@ -204,6 +206,51 @@ def submit_entry(db: Session, user: UserModel, day: date) -> DailyEntryModel:
     return entry
 
 
+def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -> list[DailyEntryModel]:
+    if payload.day_type is not DayType.OFF:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Массово проставляется только нерабочий день",
+        )
+
+    days = sorted(set(payload.dates))
+    if not days:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список дат пуст")
+
+    existing = {
+        entry.date: entry
+        for entry in db.query(DailyEntryModel)
+        .options(joinedload(DailyEntryModel.items))
+        .filter(DailyEntryModel.user_id == user.id, DailyEntryModel.date.in_(days))
+        .all()
+    }
+
+    for day in days:
+        _ensure_writable(existing.get(day), day)
+
+    entries: list[DailyEntryModel] = []
+    for day in days:
+        entry = existing.get(day)
+        if entry is None:
+            entry = DailyEntryModel(
+                user_id=user.id,
+                department_id=user.department_id,
+                date=day,
+            )
+            db.add(entry)
+            db.flush()
+        else:
+            _replace_items(db, entry, [])
+
+        entry.day_type = DayType.OFF.value
+        entry.status = DailyEntryStatus.SUBMITTED.value
+        entry.submitted_at = datetime.utcnow()
+        entries.append(entry)
+
+    db.flush()
+    return entries
+
+
 def chain_rows(
     db: Session,
     user_id: int,
@@ -279,6 +326,7 @@ def open_chains(db: Session, user_id: int, day: date) -> list[OpenChain]:
                 last_date=last_date,
                 days_open=(day - first_date).days + 1,
                 link=next((item.link for item, _ in reversed(rows) if item.link), None),
+                history=[ChainPoint(date=row_date, status=item.status) for item, row_date in rows],
             )
         )
 
@@ -315,6 +363,7 @@ def day_view(db: Session, user: UserModel, day: date) -> DayView:
         entry=get_entry(db, user.id, day),
         open_chains=open_chains(db, user.id, day),
         missing_days=missing_days(db, user, day),
+        editable_from=earliest_editable_date(date.today()),
     )
 
 

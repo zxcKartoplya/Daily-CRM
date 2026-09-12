@@ -29,6 +29,7 @@ def _get_worker_or_404(db: Session, worker_id: int) -> UserModel:
         db.query(UserModel)
         .options(
             joinedload(UserModel.department),
+            joinedload(UserModel.job),
             joinedload(UserModel.profile),
             joinedload(UserModel.settings),
         )
@@ -73,6 +74,7 @@ def _serialize_worker(user: UserModel) -> Worker:
         department_id=user.department_id,
         department_name=user.department.name if user.department else None,
         job_id=user.job_id,
+        job_name=user.job.name if user.job else None,
         status=user.status,
         schedule_type=user.schedule_type,
         work_days=user.work_days,
@@ -88,7 +90,7 @@ def list_workers(
 ) -> List[Worker]:
     query = (
         db.query(UserModel)
-        .options(joinedload(UserModel.department))
+        .options(joinedload(UserModel.department), joinedload(UserModel.job))
         .filter(UserModel.role == UserRole.EMPLOYEE.value)
         .order_by(UserModel.created_at.desc())
     )

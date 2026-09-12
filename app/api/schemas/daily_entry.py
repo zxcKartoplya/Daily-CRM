@@ -30,6 +30,11 @@ class DailyEntryWrite(BaseModel):
     items: list[EntryItemInput] = []
 
 
+class BulkDayTypeWrite(BaseModel):
+    dates: list[date]
+    day_type: DayType = DayType.OFF
+
+
 class DailyEntry(BaseModel):
     id: int
     user_id: int
@@ -43,6 +48,11 @@ class DailyEntry(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ChainPoint(BaseModel):
+    date: date
+    status: EntryItemStatus
+
+
 class OpenChain(BaseModel):
     chain_id: str
     title: str | None = None
@@ -51,12 +61,14 @@ class OpenChain(BaseModel):
     last_date: date
     days_open: int
     link: str | None = None
+    history: list[ChainPoint] = []
 
 
 class DayView(BaseModel):
     entry: DailyEntry | None = None
     open_chains: list[OpenChain] = []
     missing_days: list[date] = []
+    editable_from: date
 
 
 class ChainItem(BaseModel):

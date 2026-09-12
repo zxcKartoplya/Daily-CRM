@@ -325,6 +325,133 @@ class TestOpenChains:
         assert body["open_chains"] == []
 
 
+class TestChainPoints:
+    def test_open_chain_carries_history(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        _seed_entry(
+            db,
+            employee_user,
+            TODAY - timedelta(days=2),
+            items=[(chain_id, "начал перенос", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        _seed_entry(
+            db,
+            employee_user,
+            YESTERDAY,
+            items=[(chain_id, "жду архив", EntryItemStatus.BLOCKED.value)],
+        )
+
+        body = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
+        history = body["open_chains"][0]["history"]
+        assert [point["date"] for point in history] == [_iso(TODAY - timedelta(days=2)), _iso(YESTERDAY)]
+        assert [point["status"] for point in history] == ["in_progress", "blocked"]
+
+
+class TestEditableFrom:
+    def test_day_view_returns_backfill_boundary(self, client, employee_headers, employee_user):
+        from app.services.daily_entries import backfill_window_days
+
+        body = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
+        assert body["editable_from"] == _iso(TODAY - timedelta(days=backfill_window_days()))
+
+
+class TestBulkDaysOff:
+    def test_marks_several_days_off_as_submitted(self, client, db, employee_headers, employee_user):
+        _all_week(db, employee_user)
+        days = [_iso(YESTERDAY), _iso(TODAY - timedelta(days=2))]
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": days, "day_type": "off"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert [entry["date"] for entry in body] == sorted(days)
+        assert all(entry["day_type"] == "off" for entry in body)
+        assert all(entry["status"] == "submitted" for entry in body)
+        assert all(entry["submitted_at"] is not None for entry in body)
+
+        view = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
+        assert all(day not in view["missing_days"] for day in days)
+
+    def test_duplicate_dates_collapse(self, client, employee_headers, employee_user):
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(YESTERDAY), _iso(YESTERDAY)], "day_type": "off"},
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
+    def test_existing_draft_loses_items(self, client, db, employee_headers, employee_user):
+        _seed_entry(
+            db,
+            employee_user,
+            YESTERDAY,
+            status=DailyEntryStatus.DRAFT.value,
+            items=[(str(uuid4()), "черновик", EntryItemStatus.IN_PROGRESS.value)],
+        )
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(YESTERDAY)], "day_type": "off"},
+        )
+        assert response.status_code == 200
+        assert response.json()[0]["items"] == []
+
+    def test_outside_window_rejects_whole_batch(self, client, employee_headers, employee_user):
+        outside = TODAY - timedelta(days=60)
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(YESTERDAY), _iso(outside)], "day_type": "off"},
+        )
+        assert response.status_code == 400
+
+        view = client.get(f"/api/employee/daily/{_iso(YESTERDAY)}", headers=employee_headers).json()
+        assert view["entry"] is None
+
+    def test_submitted_past_day_rejects_whole_batch(self, client, db, employee_headers, employee_user):
+        _seed_entry(db, employee_user, YESTERDAY, items=[(str(uuid4()), "работал", EntryItemStatus.DONE.value)])
+        target = TODAY - timedelta(days=2)
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(target), _iso(YESTERDAY)], "day_type": "off"},
+        )
+        assert response.status_code == 400
+
+        view = client.get(f"/api/employee/daily/{_iso(target)}", headers=employee_headers).json()
+        assert view["entry"] is None
+
+    def test_work_day_type_rejected(self, client, employee_headers, employee_user):
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(YESTERDAY)], "day_type": "work"},
+        )
+        assert response.status_code == 400
+
+    def test_empty_dates_rejected(self, client, employee_headers, employee_user):
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [], "day_type": "off"},
+        )
+        assert response.status_code == 400
+
+    def test_admin_cannot_use_bulk(self, client, admin_headers):
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=admin_headers,
+            json={"dates": [_iso(YESTERDAY)], "day_type": "off"},
+        )
+        assert response.status_code == 403
+
+
 class TestMissingDays:
     def test_working_day_without_entry_is_missing(self, client, db, employee_headers, employee_user):
         _all_week(db, employee_user)

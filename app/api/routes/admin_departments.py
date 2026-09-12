@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
@@ -15,6 +15,7 @@ from app.api.schemas.department import Department, DepartmentCreate, DepartmentU
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
 from app.models import Department as DepartmentModel
+from app.models import Job as JobModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
 from app.services.schedule import is_working_day
@@ -23,11 +24,30 @@ from app.services.schedule import is_working_day
 router = APIRouter()
 
 
-def _to_department_response(department: DepartmentModel, employees_count: int) -> Department:
+def _to_department_response(department: DepartmentModel, employees_count: int, jobs_count: int) -> Department:
     return Department(
         id=department.id,
         name=department.name,
         employees_count=employees_count,
+        jobs_count=jobs_count,
+    )
+
+
+def _employees_count() -> object:
+    return (
+        select(func.count(UserModel.id))
+        .where(UserModel.department_id == DepartmentModel.id)
+        .correlate(DepartmentModel)
+        .scalar_subquery()
+    )
+
+
+def _jobs_count() -> object:
+    return (
+        select(func.count(JobModel.id))
+        .where(JobModel.department_id == DepartmentModel.id)
+        .correlate(DepartmentModel)
+        .scalar_subquery()
     )
 
 
@@ -46,14 +66,16 @@ def list_admin_departments(
     rows = (
         db.query(
             DepartmentModel,
-            func.count(UserModel.id).label("employees_count"),
+            _employees_count().label("employees_count"),
+            _jobs_count().label("jobs_count"),
         )
-        .outerjoin(UserModel, UserModel.department_id == DepartmentModel.id)
-        .group_by(DepartmentModel.id)
         .order_by(DepartmentModel.name.asc())
         .all()
     )
-    return [_to_department_response(department, employees_count) for department, employees_count in rows]
+    return [
+        _to_department_response(department, employees_count, jobs_count)
+        for department, employees_count, jobs_count in rows
+    ]
 
 
 @router.get("/{department_id}", response_model=Department)
@@ -65,17 +87,16 @@ def get_admin_department(
     row = (
         db.query(
             DepartmentModel,
-            func.count(UserModel.id).label("employees_count"),
+            _employees_count().label("employees_count"),
+            _jobs_count().label("jobs_count"),
         )
-        .outerjoin(UserModel, UserModel.department_id == DepartmentModel.id)
         .filter(DepartmentModel.id == department_id)
-        .group_by(DepartmentModel.id)
         .first()
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
-    department, employees_count = row
-    return _to_department_response(department, employees_count)
+    department, employees_count, jobs_count = row
+    return _to_department_response(department, employees_count, jobs_count)
 
 
 @router.post("", response_model=Department, status_code=status.HTTP_201_CREATED)
@@ -92,7 +113,7 @@ def create_admin_department(
     db.add(department)
     db.commit()
     db.refresh(department)
-    return _to_department_response(department, 0)
+    return _to_department_response(department, 0, 0)
 
 
 @router.put("/{department_id}", response_model=Department)
@@ -108,7 +129,8 @@ def update_admin_department(
     db.commit()
     db.refresh(department)
     employees_count = db.query(UserModel).filter(UserModel.department_id == department.id).count()
-    return _to_department_response(department, employees_count)
+    jobs_count = db.query(JobModel).filter(JobModel.department_id == department.id).count()
+    return _to_department_response(department, employees_count, jobs_count)
 
 
 @router.delete("/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
