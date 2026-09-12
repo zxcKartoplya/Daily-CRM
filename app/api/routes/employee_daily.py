@@ -6,13 +6,27 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_employee_user
-from app.api.schemas.daily_entry import ChainHistory, DailyEntry, DailyEntryWrite, DayView
+from app.api.schemas.daily_entry import (
+    BulkDayTypeWrite,
+    ChainHistory,
+    DailyEntry,
+    DailyEntryWrite,
+    DayView,
+)
 from app.db.session import get_db
 from app.models import User as UserModel
-from app.services.daily_entries import chain_history, day_view, list_entries, submit_entry, upsert_entry
+from app.services.daily_entries import (
+    bulk_set_day_type,
+    chain_history,
+    day_view,
+    list_entries,
+    submit_entry,
+    upsert_entry,
+)
 
 router = APIRouter()
 chains_router = APIRouter()
+bulk_router = APIRouter()
 
 
 @router.get("", response_model=List[DailyEntry])
@@ -57,6 +71,19 @@ def submit_employee_day(
     db.commit()
     db.refresh(entry)
     return entry
+
+
+@bulk_router.put("", response_model=List[DailyEntry])
+def set_employee_days_off(
+    payload: BulkDayTypeWrite,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_employee_user),
+) -> List[DailyEntry]:
+    entries = bulk_set_day_type(db, current_user, payload)
+    db.commit()
+    for entry in entries:
+        db.refresh(entry)
+    return entries
 
 
 @chains_router.get("/{chain_id}", response_model=ChainHistory)

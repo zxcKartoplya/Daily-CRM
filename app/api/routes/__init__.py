@@ -31,6 +31,12 @@ router.include_router(
     include_in_schema=True,
 )
 router.include_router(
+    employee_daily.bulk_router,
+    prefix="/employee/daily-bulk",
+    tags=["employee-daily"],
+    include_in_schema=True,
+)
+router.include_router(
     employee_daily.chains_router,
     prefix="/employee/daily-chains",
     tags=["employee-daily"],
