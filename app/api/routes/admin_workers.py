@@ -8,13 +8,14 @@ from app.api.dependencies import require_admin_user
 from app.api.schemas.worker import Worker, WorkerAIFeedback, WorkerCreate, WorkerDetail, WorkerUpdate
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models import DailyReport as DailyReportModel
+from app.models import DailyEntry as DailyEntryModel
 from app.models import Department as DepartmentModel
 from app.models import InternalChatMessage as InternalChatMessageModel
 from app.models import Job as JobModel
 from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
-from app.models.enums import UserRole
+from app.models.enums import CLOSED_ITEM_STATUSES, EntryItemStatus, UserRole
+from app.services.daily_entries import chain_rows, group_by_chain
 from app.services.gigachat import GigaChatClient
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
 from app.services.users import ensure_employee_context, serialize_user_detail
@@ -247,13 +248,12 @@ def get_worker_ai_feedback(
         for msg in chat_messages
     )
 
-    reports = (
-        db.query(DailyReportModel)
-        .filter(DailyReportModel.user_id == worker_id, DailyReportModel.report_date >= since)
-        .order_by(DailyReportModel.report_date.desc())
-        .limit(10)
-        .all()
+    entries_count = (
+        db.query(DailyEntryModel)
+        .filter(DailyEntryModel.user_id == worker_id, DailyEntryModel.date >= since)
+        .count()
     )
+    chains = group_by_chain(chain_rows(db, worker_id))
     statistics = (
         db.query(StatisticModel)
         .filter(StatisticModel.user_id == worker_id, StatisticModel.date >= since)
@@ -276,16 +276,24 @@ def get_worker_ai_feedback(
         stats_text = f"\nЧисловые показатели (последние {len(statistics)} дней): {vals}"
 
     reports_supplement = ""
-    if reports:
-        ratings = [r.self_rating for r in reports if r.self_rating is not None]
-        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
-        needs_help_count = sum(1 for r in reports if r.needs_help)
-        blockers_count = sum(1 for r in reports if r.blockers_text and r.blockers_text.strip())
+    if entries_count:
+        open_chains_count = sum(
+            1 for rows in chains.values() if rows[-1][0].status not in CLOSED_ITEM_STATUSES
+        )
+        dropped_chains_count = sum(
+            1 for rows in chains.values() if rows[-1][0].status == EntryItemStatus.DROPPED.value
+        )
+        blocked_items_count = sum(
+            1
+            for rows in chains.values()
+            for item, day in rows
+            if item.status == EntryItemStatus.BLOCKED.value and day >= since
+        )
         reports_supplement = (
-            f"\nДополнительно — формальные дейли-отчёты ({len(reports)} шт. за 30 дней):\n"
-            f"Средняя самооценка: {avg_rating if avg_rating is not None else 'нет данных'}/10\n"
-            f"Блокеры: {blockers_count} раз(а)\n"
-            f"Просил помощи: {needs_help_count} раз(а)\n"
+            f"\nДополнительно — дейлики в системе ({entries_count} записей за 30 дней):\n"
+            f"Открытых линий работы: {open_chains_count}\n"
+            f"Пунктов в блокере за 30 дней: {blocked_items_count}\n"
+            f"Брошенных линий: {dropped_chains_count}\n"
         )
 
     prompt = (

@@ -20,28 +20,26 @@ class ScheduleType(str, Enum):
 DEFAULT_WORK_DAYS: list[int] = [1, 2, 3, 4, 5]
 
 
-class DailyReportSource(str, Enum):
-    INTERNAL_WEB = "internal_web"
-    TELEGRAM = "telegram"
-    SLACK = "slack"
-    EMAIL = "email"
-    API = "api"
+class DayType(str, Enum):
+    WORK = "work"
+    OFF = "off"
 
 
-class DailyReportStatus(str, Enum):
+class DailyEntryStatus(str, Enum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
-    IMPORTED = "imported"
 
 
-class BlockerType(str, Enum):
-    TECHNICAL = "technical"
-    PROCESS = "process"
-    EXTERNAL = "external"
-    PERSONAL = "personal"
-    OTHER = "other"
-
-
-class DailyReportTaskSlot(str, Enum):
+class EntryItemStatus(str, Enum):
+    IN_PROGRESS = "in_progress"
+    BLOCKED = "blocked"
     DONE = "done"
-    PLANNED = "planned"
+    DROPPED = "dropped"
+
+
+OPEN_ITEM_STATUSES: frozenset[str] = frozenset(
+    {EntryItemStatus.IN_PROGRESS.value, EntryItemStatus.BLOCKED.value}
+)
+CLOSED_ITEM_STATUSES: frozenset[str] = frozenset(
+    {EntryItemStatus.DONE.value, EntryItemStatus.DROPPED.value}
+)

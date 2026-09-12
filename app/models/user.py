@@ -27,7 +27,7 @@ class User(Base):
     job = relationship("Job", back_populates="users")
     profile = relationship("EmployeeProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     settings = relationship("EmployeeSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    daily_reports = relationship("DailyReport", back_populates="user", cascade="all, delete-orphan")
+    daily_entries = relationship("DailyEntry", back_populates="user", cascade="all, delete-orphan")
     internal_chat_messages = relationship(
         "InternalChatMessage",
         back_populates="user",
