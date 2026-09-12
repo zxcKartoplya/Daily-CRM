@@ -1773,6 +1773,17 @@
             ],
             "title": "Job Id"
           },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1963,6 +1974,17 @@
               }
             ],
             "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
           },
           "name": {
             "title": "Name",

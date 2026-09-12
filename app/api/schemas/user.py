@@ -46,6 +46,7 @@ class UserInDBBase(UserBase):
 
 class User(UserInDBBase):
     department_name: str | None = None
+    job_name: str | None = None
 
 
 class UserDetail(User):

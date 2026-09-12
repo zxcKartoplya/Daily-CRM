@@ -1,0 +1,17 @@
+- generic [ref=f9e4]:
+  - complementary [ref=f9e5]:
+    - link "DailyCRM" [ref=f9e6] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=f9e10]:
+      - link "Главная" [ref=f9e11] [cursor=pointer]:
+        - /url: /
+      - link "Департаменты" [ref=f9e14] [cursor=pointer]:
+        - /url: /departments
+      - link "Сотрудники" [ref=f9e17] [cursor=pointer]:
+        - /url: /workers
+      - link "Оценщики" [ref=f9e20] [cursor=pointer]:
+        - /url: /reviewer
+      - link "Роли" [ref=f9e23] [cursor=pointer]:
+        - /url: /role
+    - button "Тёмная тема" [ref=f9e27] [cursor=pointer]
+  - main [ref=f9e30]

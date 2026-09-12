@@ -45,6 +45,24 @@ class TestWorkerJobName:
         body = client.get("/api/admin/workers", headers=admin_headers).json()
         assert body[0]["job_name"] is None
 
+    def test_worker_card_carries_job_name(self, client, db, admin_headers):
+        department = _department(db)
+        job = _job(db, department)
+        worker = User(
+            name="Сотрудник",
+            email="worker@test.com",
+            role=UserRole.EMPLOYEE.value,
+            status=UserStatus.ACTIVE.value,
+            department_id=department.id,
+            job_id=job.id,
+        )
+        db.add(worker)
+        db.commit()
+        db.refresh(worker)
+
+        body = client.get(f"/api/admin/workers/{worker.id}", headers=admin_headers).json()
+        assert body["job_name"] == "Бэкендер"
+
 
 class TestDepartmentCounters:
     def test_counters_are_independent(self, client, db, admin_headers):

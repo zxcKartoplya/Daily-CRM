@@ -1,0 +1,15 @@
+- main [ref=f4e5]:
+  - generic [ref=f4e7]:
+    - generic [ref=f4e8]: DailyCRM
+    - heading "Вход в систему" [level=1] [ref=f4e12]
+    - paragraph [ref=f4e13]: Управление структурой компании и оценками сотрудников.
+    - generic [ref=f4e14]:
+      - generic [ref=f4e15]:
+        - generic [ref=f4e16]: Почта
+        - textbox "Почта" [ref=f4e20]:
+          - /placeholder: name@company.ru
+      - generic [ref=f4e21]:
+        - generic [ref=f4e22]: Пароль
+        - textbox "Пароль" [ref=f4e26]:
+          - /placeholder: Введите пароль
+    - button "Войти" [ref=f4e27] [cursor=pointer]

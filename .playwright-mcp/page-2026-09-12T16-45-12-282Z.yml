@@ -1,0 +1,98 @@
+- generic [ref=f5e4]:
+  - complementary [ref=f5e5]:
+    - link "DailyCRM" [ref=f5e6] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=f5e10]:
+      - link "Главная" [ref=f5e11] [cursor=pointer]:
+        - /url: /
+      - link "Департаменты" [ref=f5e14] [cursor=pointer]:
+        - /url: /departments
+      - link "Сотрудники" [ref=f5e17] [cursor=pointer]:
+        - /url: /workers
+      - link "Оценщики" [ref=f5e20] [cursor=pointer]:
+        - /url: /reviewer
+      - link "Роли" [ref=f5e23] [cursor=pointer]:
+        - /url: /role
+    - button "Тёмная тема" [ref=f5e27] [cursor=pointer]
+  - main [ref=f5e30]:
+    - generic [ref=f5e31]:
+      - heading "Пивной деп" [level=1] [ref=f5e33]
+      - generic [ref=f5e34]:
+        - generic [ref=f5e35]:
+          - term [ref=f5e36]: Сотрудников
+          - definition [ref=f5e37]: "2"
+        - generic [ref=f5e38]:
+          - term [ref=f5e39]: Ролей
+          - definition [ref=f5e40]: "1"
+      - generic [ref=f5e41]:
+        - generic [ref=f5e42]:
+          - heading "Дейлики" [level=2] [ref=f5e43]
+          - generic [ref=f5e44]:
+            - button "7 дней" [ref=f5e45] [cursor=pointer]
+            - button "14 дней" [ref=f5e47] [cursor=pointer]
+            - button "30 дней" [ref=f5e49] [cursor=pointer]
+        - generic [ref=f5e51]:
+          - table [ref=f5e53]:
+            - rowgroup [ref=f5e54]:
+              - row [ref=f5e55]:
+                - columnheader "Сотрудник" [ref=f5e56]
+                - columnheader "вс 6 сент." [ref=f5e57]:
+                  - generic [ref=f5e58]: вс
+                  - generic [ref=f5e59]: 6 сент.
+                - columnheader "пн 7 сент." [ref=f5e60]:
+                  - generic [ref=f5e61]: пн
+                  - generic [ref=f5e62]: 7 сент.
+                - columnheader "вт 8 сент." [ref=f5e63]:
+                  - generic [ref=f5e64]: вт
+                  - generic [ref=f5e65]: 8 сент.
+                - columnheader "ср 9 сент." [ref=f5e66]:
+                  - generic [ref=f5e67]: ср
+                  - generic [ref=f5e68]: 9 сент.
+                - columnheader "чт 10 сент." [ref=f5e69]:
+                  - generic [ref=f5e70]: чт
+                  - generic [ref=f5e71]: 10 сент.
+                - columnheader "пт 11 сент." [ref=f5e72]:
+                  - generic [ref=f5e73]: пт
+                  - generic [ref=f5e74]: 11 сент.
+                - columnheader "сб 12 сент." [ref=f5e75]:
+                  - generic [ref=f5e76]: сб
+                  - generic [ref=f5e77]: 12 сент.
+                - columnheader "Пропусков" [ref=f5e78]
+            - rowgroup [ref=f5e79]:
+              - row [ref=f5e80]:
+                - cell "Кирюша" [ref=f5e81]
+                - cell "6 сент. — не по графику" [ref=f5e82]
+                - cell "7 сент. — не заполнен" [ref=f5e84]
+                - cell "8 сент. — не заполнен" [ref=f5e86]
+                - cell "9 сент. — не заполнен" [ref=f5e88]
+                - cell "10 сент. — не заполнен" [ref=f5e90]
+                - cell "11 сент. — не заполнен" [ref=f5e92]
+                - cell "12 сент. — не по графику" [ref=f5e94]
+                - cell "5" [ref=f5e96]
+              - row [ref=f5e97]:
+                - cell "Кирюша" [ref=f5e98]
+                - cell "6 сент. — не по графику" [ref=f5e99]
+                - cell "7 сент. — не заполнен" [ref=f5e101]
+                - cell "8 сент. — не заполнен" [ref=f5e103]
+                - cell "9 сент. — не заполнен" [ref=f5e105]
+                - cell "10 сент. — не заполнен" [ref=f5e107]
+                - cell "11 сент. — не заполнен" [ref=f5e109]
+                - cell "12 сент. — не по графику" [ref=f5e111]
+                - cell "5" [ref=f5e113]
+          - list [ref=f5e114]:
+            - listitem [ref=f5e115]: отправлен
+            - listitem [ref=f5e117]: черновик
+            - listitem [ref=f5e119]: не заполнен
+            - listitem [ref=f5e121]: нерабочий день
+            - listitem [ref=f5e123]: не по графику
+      - generic [ref=f5e125]:
+        - heading "Переименовать департамент" [level=2] [ref=f5e126]
+        - generic [ref=f5e127]:
+          - generic [ref=f5e128]:
+            - generic [ref=f5e129]: Название
+            - textbox "Название" [ref=f5e133]:
+              - /placeholder: Введите название департамента
+              - text: Пивной деп
+          - generic [ref=f5e134]:
+            - button "Сохранить" [ref=f5e135] [cursor=pointer]
+            - button "Отмена" [ref=f5e137] [cursor=pointer]
