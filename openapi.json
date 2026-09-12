@@ -376,6 +376,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "jobs_count": {
+            "title": "Jobs Count",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -384,7 +388,8 @@
         "required": [
           "name",
           "id",
-          "employees_count"
+          "employees_count",
+          "jobs_count"
         ],
         "title": "Department",
         "type": "object"
@@ -2235,6 +2240,17 @@
             ],
             "title": "Job Id"
           },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2440,6 +2456,17 @@
               }
             ],
             "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
           },
           "name": {
             "title": "Name",

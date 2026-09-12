@@ -36,6 +36,7 @@ class Worker(BaseModel):
     department_id: int | None = None
     department_name: str | None = None
     job_id: int | None = None
+    job_name: str | None = None
     status: str
     schedule_type: ScheduleType
     work_days: list[int] | None = None
