@@ -30,6 +30,14 @@ class DailyEntryStatus(str, Enum):
     SUBMITTED = "submitted"
 
 
+class DayState(str, Enum):
+    SUBMITTED = "submitted"
+    DRAFT = "draft"
+    MISSING = "missing"
+    OFF = "off"
+    REST = "rest"
+
+
 class EntryItemStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     BLOCKED = "blocked"
