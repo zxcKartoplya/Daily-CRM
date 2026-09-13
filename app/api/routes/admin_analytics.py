@@ -10,8 +10,10 @@ from app.api.dependencies import require_admin_user
 from app.api.schemas.analytics import (
     AnalyticsOverview,
     AnalyticsTimeseriesPoint,
+    CompletionTrendPoint,
     DepartmentAnalytics,
     TodayState,
+    WorkerCompletion,
 )
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
@@ -26,6 +28,13 @@ from app.services.day_state import (
     is_employed_on,
     is_tracked_employee,
     resolve_day_state,
+)
+from app.services.worker_statistics import (
+    CompletionSummary,
+    PeriodCompletion,
+    combine_summaries,
+    completion_summary,
+    resolve_statistics_period,
 )
 
 router = APIRouter()
@@ -56,6 +65,36 @@ def _entries_by_day(
     for entry in entries:
         by_day[entry.date][entry.user_id] = entry
     return by_day
+
+
+def _completion_summaries(
+    db: Session,
+    employees: List[UserModel],
+    period_start: date,
+    period_end: date,
+) -> dict[int, CompletionSummary]:
+    entries_by_user: dict[int, dict[date, DailyEntryModel]] = defaultdict(dict)
+    for day, entries in _entries_by_day(db, employees, period_start, period_end).items():
+        for user_id, entry in entries.items():
+            entries_by_user[user_id][day] = entry
+    return {
+        employee.id: completion_summary(employee, period_start, period_end, entries_by_user.get(employee.id, {}))
+        for employee in employees
+    }
+
+
+def _trend_points(summary: CompletionSummary) -> list[CompletionTrendPoint]:
+    return [_trend_point(point) for point in summary.trend]
+
+
+def _trend_point(completion: PeriodCompletion) -> CompletionTrendPoint:
+    return CompletionTrendPoint(
+        date_from=completion.date_from,
+        date_to=completion.date_to,
+        working_days=completion.working_days,
+        submitted=completion.submitted,
+        completion_rate=completion.completion_rate,
+    )
 
 
 def _blocked_items_query(db: Session, since: date | None = None):
@@ -108,11 +147,54 @@ def get_admin_analytics_overview(
     )
 
 
+@router.get("/workers", response_model=List[WorkerCompletion])
+def get_workers_completion(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(require_admin_user),
+) -> List[WorkerCompletion]:
+    period_start, period_end = resolve_statistics_period(date_from, date_to)
+
+    employees = (
+        db.query(UserModel)
+        .filter(UserModel.role == UserRole.EMPLOYEE.value)
+        .order_by(UserModel.name.asc(), UserModel.id.asc())
+        .all()
+    )
+    summaries = _completion_summaries(db, employees, period_start, period_end)
+
+    return [
+        WorkerCompletion(
+            user_id=employee.id,
+            working_days=summaries[employee.id].total.working_days,
+            submitted=summaries[employee.id].total.submitted,
+            completion_rate=summaries[employee.id].total.completion_rate,
+            trend=_trend_points(summaries[employee.id]),
+        )
+        for employee in employees
+    ]
+
+
 @router.get("/departments", response_model=List[DepartmentAnalytics])
 def get_department_analytics(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
 ) -> List[DepartmentAnalytics]:
+    period_start, period_end = resolve_statistics_period(date_from, date_to)
+
+    employees = (
+        db.query(UserModel)
+        .filter(UserModel.role == UserRole.EMPLOYEE.value, UserModel.department_id.isnot(None))
+        .all()
+    )
+    summaries = _completion_summaries(db, employees, period_start, period_end)
+    summaries_by_department: dict[int, list[CompletionSummary]] = defaultdict(list)
+    for employee in employees:
+        summaries_by_department[employee.department_id].append(summaries[employee.id])
+
     employee_counts = dict(
         db.query(UserModel.department_id, func.count(UserModel.id))
         .filter(UserModel.role == UserRole.EMPLOYEE.value)
@@ -138,17 +220,24 @@ def get_department_analytics(
             open_counts[department_id] += 1
 
     departments = db.query(DepartmentModel).order_by(DepartmentModel.name.asc()).all()
-    return [
-        DepartmentAnalytics(
-            department_id=department.id,
-            department_name=department.name,
-            employees_count=int(employee_counts.get(department.id, 0)),
-            entries_count=int(entry_counts.get(department.id, 0)),
-            open_chains_count=int(open_counts.get(department.id, 0)),
-            blocked_items_count=int(blocked_counts.get(department.id, 0)),
+    results: List[DepartmentAnalytics] = []
+    for department in departments:
+        summary = combine_summaries(period_start, period_end, summaries_by_department.get(department.id, []))
+        results.append(
+            DepartmentAnalytics(
+                department_id=department.id,
+                department_name=department.name,
+                employees_count=int(employee_counts.get(department.id, 0)),
+                entries_count=int(entry_counts.get(department.id, 0)),
+                open_chains_count=int(open_counts.get(department.id, 0)),
+                blocked_items_count=int(blocked_counts.get(department.id, 0)),
+                working_days=summary.total.working_days,
+                submitted=summary.total.submitted,
+                completion_rate=summary.total.completion_rate,
+                trend=_trend_points(summary),
+            )
         )
-        for department in departments
-    ]
+    return results
 
 
 def _resolve_period(date_from: date | None, date_to: date | None) -> tuple[date, date]:
