@@ -1481,62 +1481,6 @@
         "title": "EmployeeSettingsUpdate",
         "type": "object"
       },
-      "EmployeeStatistics": {
-        "properties": {
-          "blockers_count": {
-            "title": "Blockers Count",
-            "type": "integer"
-          },
-          "completion_rate": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completion Rate"
-          },
-          "dropped_chains_count": {
-            "title": "Dropped Chains Count",
-            "type": "integer"
-          },
-          "last_entry_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Entry At"
-          },
-          "open_chains_count": {
-            "title": "Open Chains Count",
-            "type": "integer"
-          },
-          "streak": {
-            "title": "Streak",
-            "type": "integer"
-          },
-          "user_id": {
-            "title": "User Id",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "user_id",
-          "streak",
-          "open_chains_count",
-          "blockers_count",
-          "dropped_chains_count"
-        ],
-        "title": "EmployeeStatistics",
-        "type": "object"
-      },
       "EntryItem": {
         "properties": {
           "chain_id": {
@@ -8026,55 +7970,6 @@
         "summary": "Update Employee Settings",
         "tags": [
           "employee-settings"
-        ]
-      }
-    },
-    "/api/employee/statistics": {
-      "get": {
-        "operationId": "get_employee_statistics_api_employee_statistics_get",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "Authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EmployeeStatistics"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Employee Statistics",
-        "tags": [
-          "employee-statistics"
         ]
       }
     }

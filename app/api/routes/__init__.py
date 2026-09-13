@@ -13,7 +13,6 @@ from app.api.routes import (
     employee_daily,
     employee_profile,
     employee_settings,
-    employee_statistics,
     internal_chat,
     jobs,
     reviewers,
@@ -44,12 +43,6 @@ router.include_router(
     employee_daily.chains_router,
     prefix="/employee/daily-chains",
     tags=["employee-daily"],
-    include_in_schema=True,
-)
-router.include_router(
-    employee_statistics.router,
-    prefix="/employee/statistics",
-    tags=["employee-statistics"],
     include_in_schema=True,
 )
 router.include_router(
