@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Iterable, Mapping, Sequence
 
 from app.models.enums import DailyEntryStatus, DayState, DayType, UserRole, UserStatus
@@ -53,3 +54,30 @@ def completion_rate(submitted: int, working_employees: int) -> float | None:
     if working_employees <= 0:
         return None
     return round(submitted / working_employees, COMPLETION_RATE_PRECISION)
+
+
+@dataclass(frozen=True)
+class DayTotals:
+    day: date
+    working_employees: int
+    counts: dict[DayState, int]
+
+
+def day_totals(
+    users: Sequence,
+    period_start: date,
+    period_end: date,
+    entries_by_day: Mapping[date, Mapping[int, object]],
+) -> list[DayTotals]:
+    totals: list[DayTotals] = []
+    for offset in range((period_end - period_start).days + 1):
+        day = period_start + timedelta(days=offset)
+        working = scheduled_employees(users, day)
+        totals.append(
+            DayTotals(
+                day=day,
+                working_employees=len(working),
+                counts=count_day_states(working, day, entries_by_day.get(day, {})),
+            )
+        )
+    return totals

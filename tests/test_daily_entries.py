@@ -884,8 +884,8 @@ class TestChainsAfterBackfill:
             (_iso(TODAY), "in_progress"),
         ]
 
-        statistics = client.get("/api/employee/statistics", headers=employee_headers).json()
-        assert statistics["open_chains_count"] == 1
+        activity = client.get("/api/employee/activity", headers=employee_headers).json()
+        assert activity["summary"]["open_count"] == 1
 
     def test_removing_first_item_shortens_chain(self, client, db, employee_headers, employee_user):
         chain_id = str(uuid4())
@@ -926,7 +926,7 @@ class TestChainsAfterBackfill:
 
         assert client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"] == []
         assert client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).status_code == 404
-        assert client.get("/api/employee/statistics", headers=employee_headers).json()["open_chains_count"] == 0
+        assert client.get("/api/employee/activity", headers=employee_headers).json()["summary"]["open_count"] == 0
 
     def test_chain_extended_back_starts_from_new_first_day(self, client, db, employee_headers, employee_user):
         chain_id = str(uuid4())
@@ -1006,7 +1006,7 @@ class TestChainsAfterBackfill:
         history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
         assert [item["date"] for item in history["items"]] == [_iso(first_day), _iso(YESTERDAY)]
         assert client.get(f"/api/employee/daily-chains/{only_there}", headers=employee_headers).status_code == 404
-        assert client.get("/api/employee/statistics", headers=employee_headers).json()["open_chains_count"] == 1
+        assert client.get("/api/employee/activity", headers=employee_headers).json()["summary"]["open_count"] == 1
 
     def test_bulk_day_off_on_last_day_falls_back_to_previous_item(self, client, db, employee_headers, employee_user):
         _all_week(db, employee_user)

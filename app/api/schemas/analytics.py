@@ -5,16 +5,6 @@ from pydantic import BaseModel
 from app.models.enums import DayState
 
 
-class EmployeeStatistics(BaseModel):
-    user_id: int
-    streak: int
-    completion_rate: float | None = None
-    open_chains_count: int
-    blockers_count: int
-    dropped_chains_count: int
-    last_entry_at: datetime | None = None
-
-
 class WorkerStatistics(BaseModel):
     user_id: int
     period_from: date
