@@ -561,9 +561,18 @@
       },
       "DayView": {
         "properties": {
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
           "editable_from": {
             "format": "date",
             "title": "Editable From",
+            "type": "string"
+          },
+          "editable_until": {
+            "format": "date",
+            "title": "Editable Until",
             "type": "string"
           },
           "entry": {
@@ -595,7 +604,9 @@
           }
         },
         "required": [
-          "editable_from"
+          "editable_from",
+          "editable",
+          "editable_until"
         ],
         "title": "DayView",
         "type": "object"

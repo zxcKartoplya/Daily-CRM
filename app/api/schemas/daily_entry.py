@@ -69,6 +69,8 @@ class DayView(BaseModel):
     open_chains: list[OpenChain] = []
     missing_days: list[date] = []
     editable_from: date
+    editable: bool
+    editable_until: date
 
 
 class ChainItem(BaseModel):
