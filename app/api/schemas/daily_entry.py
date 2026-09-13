@@ -110,11 +110,26 @@ class DepartmentDailyDay(BaseModel):
     entry: AdminDailyEntry | None = None
 
 
+class DepartmentDailyStats(BaseModel):
+    working_days: int
+    submitted: int
+    draft: int
+    missing: int
+    off: int
+    completion_rate: float | None = None
+    streak: int
+    blockers: int
+    done_items: int
+
+
 class DepartmentDailyEmployee(BaseModel):
     user_id: int
     user_name: str
+    job_id: int | None = None
+    job_name: str | None = None
     schedule_type: ScheduleType
     work_days: list[int] | None = None
+    stats: DepartmentDailyStats
     days: list[DepartmentDailyDay] = []
 
 

@@ -928,8 +928,33 @@
             "title": "Days",
             "type": "array"
           },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
           "schedule_type": {
             "$ref": "#/components/schemas/ScheduleType"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/DepartmentDailyStats"
           },
           "user_id": {
             "title": "User Id",
@@ -957,9 +982,69 @@
         "required": [
           "user_id",
           "user_name",
-          "schedule_type"
+          "schedule_type",
+          "stats"
         ],
         "title": "DepartmentDailyEmployee",
+        "type": "object"
+      },
+      "DepartmentDailyStats": {
+        "properties": {
+          "blockers": {
+            "title": "Blockers",
+            "type": "integer"
+          },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "done_items": {
+            "title": "Done Items",
+            "type": "integer"
+          },
+          "draft": {
+            "title": "Draft",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "off": {
+            "title": "Off",
+            "type": "integer"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "working_days",
+          "submitted",
+          "draft",
+          "missing",
+          "off",
+          "streak",
+          "blockers",
+          "done_items"
+        ],
+        "title": "DepartmentDailyStats",
         "type": "object"
       },
       "DepartmentUpdate": {
