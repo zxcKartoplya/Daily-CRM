@@ -12,7 +12,7 @@ from app.models import Job as JobModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
-from app.services.users import ensure_employee_context, serialize_user, serialize_user_detail
+from app.services.users import apply_access_status, ensure_employee_context, serialize_user, serialize_user_detail
 
 
 router = APIRouter()
@@ -117,11 +117,11 @@ def create_admin_user(
         password_hash=hash_password(payload.password) if payload.password else None,
         role=payload.role.value,
         department_id=payload.department_id,
-        status=payload.status.value,
         job_id=payload.job_id,
         schedule_type=schedule_type,
         work_days=work_days,
     )
+    apply_access_status(user, payload.status)
     db.add(user)
     db.flush()
     ensure_employee_context(db, user)
@@ -160,12 +160,14 @@ def update_admin_user(
 
     if "role" in update_data and update_data["role"] is not None:
         update_data["role"] = update_data["role"].value
-    if "status" in update_data and update_data["status"] is not None:
-        update_data["status"] = update_data["status"].value
     if "password" in update_data:
         password = update_data.pop("password")
         if password:
             user.password_hash = hash_password(password)
+
+    requested_status = update_data.pop("status", None)
+    if requested_status is not None:
+        apply_access_status(user, requested_status)
 
     apply_schedule_update(user, update_data)
 

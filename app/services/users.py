@@ -1,12 +1,31 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.api.schemas.user import User, UserDetail
 from app.models import EmployeeProfile as EmployeeProfileModel
 from app.models import EmployeeSettings as EmployeeSettingsModel
 from app.models import User as UserModel
-from app.models.enums import UserRole
+from app.models.enums import UserAccessStatus, UserRole, UserStatus
+
+
+def access_status(user: UserModel, *, access_open: bool) -> UserStatus:
+    if not access_open:
+        return UserStatus.INACTIVE
+    if user.password_hash and user.last_login_at is not None:
+        return UserStatus.ACTIVE
+    return UserStatus.INVITED
+
+
+def apply_access_status(user: UserModel, requested: UserAccessStatus) -> None:
+    user.status = access_status(user, access_open=requested is UserAccessStatus.ACTIVE).value
+
+
+def register_login(user: UserModel) -> None:
+    user.last_login_at = datetime.utcnow()
+    user.status = access_status(user, access_open=True).value
 
 
 def ensure_employee_profile(db: Session, user: UserModel) -> EmployeeProfileModel:

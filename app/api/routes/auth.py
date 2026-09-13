@@ -8,7 +8,7 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.db.session import get_db
 from app.models import User as UserModel
 from app.models.enums import UserRole, UserStatus
-from app.services.users import ensure_employee_context, serialize_user
+from app.services.users import ensure_employee_context, register_login, serialize_user
 
 
 router = APIRouter()
@@ -42,9 +42,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     user = db.query(UserModel).filter(UserModel.email == payload.email).first()
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Неверный логин или пароль")
-    if user.status != UserStatus.ACTIVE.value:
+    if user.status == UserStatus.INACTIVE.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь не активен")
 
+    register_login(user)
     ensure_employee_context(db, user)
     db.commit()
     db.refresh(user)

@@ -12,7 +12,8 @@ from app.models import Assessment as AssessmentModel
 from app.models import Job as JobModel
 from app.models import Reviewer as ReviewerModel
 from app.models import User as UserModel
-from app.models.enums import UserRole, UserStatus
+from app.models.enums import UserRole
+from app.services.day_state import is_tracked_employee
 
 DEFAULT_PERIOD_DAYS = 30
 USAGE_WINDOW_DAYS = 30
@@ -173,14 +174,12 @@ def calculate_reviewer_usage(db: Session, reviewer: ReviewerModel) -> ReviewerUs
 
     employees_covered = 0
     if job_ids:
-        employees_covered = (
-            db.query(UserModel)
-            .filter(
-                UserModel.job_id.in_(job_ids),
-                UserModel.role == UserRole.EMPLOYEE.value,
-                UserModel.status == UserStatus.ACTIVE.value,
-            )
-            .count()
+        employees_covered = sum(
+            1
+            for user in db.query(UserModel)
+            .filter(UserModel.job_id.in_(job_ids), UserModel.role == UserRole.EMPLOYEE.value)
+            .all()
+            if is_tracked_employee(user)
         )
 
     return ReviewerUsage(

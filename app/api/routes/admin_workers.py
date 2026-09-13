@@ -29,7 +29,7 @@ from app.services.daily_entries import chain_rows, group_by_chain
 from app.services.dailies_grid import build_daily_days
 from app.services.gigachat import GigaChatClient
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
-from app.services.users import ensure_employee_context, serialize_user_detail
+from app.services.users import apply_access_status, ensure_employee_context, serialize_user_detail
 from app.services.worker_statistics import calculate_worker_statistics, days_in_range, resolve_statistics_period
 
 
@@ -154,10 +154,10 @@ def create_worker(
         role=UserRole.EMPLOYEE.value,
         department_id=payload.department_id,
         job_id=payload.job_id,
-        status=payload.status.value,
         schedule_type=schedule_type,
         work_days=work_days,
     )
+    apply_access_status(user, payload.status)
     db.add(user)
     db.flush()
     ensure_employee_context(db, user)
@@ -197,13 +197,14 @@ def update_worker(
     new_dept_id = update_data.get("department_id", user.department_id)
     _validate_job_department(db, new_job_id, new_dept_id)
 
-    if "status" in update_data and update_data["status"] is not None:
-        update_data["status"] = update_data["status"].value
-
     if "password" in update_data:
         password = update_data.pop("password")
         if password:
             user.password_hash = hash_password(password)
+
+    requested_status = update_data.pop("status", None)
+    if requested_status is not None:
+        apply_access_status(user, requested_status)
 
     apply_schedule_update(user, update_data)
 

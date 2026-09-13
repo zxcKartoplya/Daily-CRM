@@ -2554,6 +2554,14 @@
         "title": "User",
         "type": "object"
       },
+      "UserAccessStatus": {
+        "enum": [
+          "active",
+          "inactive"
+        ],
+        "title": "UserAccessStatus",
+        "type": "string"
+      },
       "UserCreate": {
         "properties": {
           "department_id": {
@@ -2620,7 +2628,7 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/UserStatus",
+            "$ref": "#/components/schemas/UserAccessStatus",
             "default": "active"
           },
           "work_days": {
@@ -2874,7 +2882,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserStatus"
+                "$ref": "#/components/schemas/UserAccessStatus"
               },
               {
                 "type": "null"
@@ -3246,7 +3254,7 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/UserStatus",
+            "$ref": "#/components/schemas/UserAccessStatus",
             "default": "active"
           },
           "work_days": {
@@ -3655,7 +3663,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserStatus"
+                "$ref": "#/components/schemas/UserAccessStatus"
               },
               {
                 "type": "null"

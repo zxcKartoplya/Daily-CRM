@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict
 from app.api.schemas.assessment import AssessmentMetric
 from app.api.schemas.employee_profile import EmployeeProfile
 from app.api.schemas.employee_settings import EmployeeSettings
-from app.models.enums import ScheduleType, UserStatus
+from app.models.enums import ScheduleType, UserAccessStatus
 
 
 class WorkerCreate(BaseModel):
@@ -14,7 +14,7 @@ class WorkerCreate(BaseModel):
     password: str | None = None
     department_id: int | None = None
     job_id: int | None = None
-    status: UserStatus = UserStatus.ACTIVE
+    status: UserAccessStatus = UserAccessStatus.ACTIVE
     schedule_type: ScheduleType | None = None
     work_days: list[int] | None = None
 
@@ -25,7 +25,7 @@ class WorkerUpdate(BaseModel):
     password: str | None = None
     department_id: int | None = None
     job_id: int | None = None
-    status: UserStatus | None = None
+    status: UserAccessStatus | None = None
     schedule_type: ScheduleType | None = None
     work_days: list[int] | None = None
 

@@ -29,7 +29,7 @@ def is_employed_on(user, day: date) -> bool:
 
 
 def is_tracked_employee(user) -> bool:
-    return user.role == UserRole.EMPLOYEE.value and user.status == UserStatus.ACTIVE.value
+    return user.role == UserRole.EMPLOYEE.value and user.status != UserStatus.INACTIVE.value
 
 
 def scheduled_employees(users: Iterable, day: date) -> list:
