@@ -21,6 +21,7 @@ class DailyEntry(Base):
     day_type = Column(String, nullable=False, default=DayType.WORK.value)
     status = Column(String, nullable=False, default=DailyEntryStatus.DRAFT.value)
     submitted_at = Column(DateTime, nullable=True)
+    edited_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
