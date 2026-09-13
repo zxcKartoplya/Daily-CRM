@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.models import DailyEntry, EntryItem
 from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus
+from app.services.daily_entries import backfill_window_days
 
 TODAY = date.today()
 YESTERDAY = TODAY - timedelta(days=1)
@@ -200,7 +201,7 @@ class TestSaveDay:
         )
         assert response.status_code == 200
 
-    def test_submitted_past_day_is_closed(self, client, db, employee_headers, employee_user):
+    def test_submitted_past_day_inside_window_is_editable(self, client, db, employee_headers, employee_user):
         _seed_entry(
             db,
             employee_user,
@@ -210,8 +211,53 @@ class TestSaveDay:
         response = client.put(
             f"/api/employee/daily/{_iso(YESTERDAY)}",
             headers=employee_headers,
+            json={"items": [{"text": "уточнил вчерашнее", "status": "done"}]},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "submitted"
+        assert body["submitted_at"] is not None
+        assert [item["text"] for item in body["items"]] == ["уточнил вчерашнее"]
+
+    def test_submitted_day_on_window_edge_is_editable(self, client, db, employee_headers, employee_user):
+        edge = TODAY - timedelta(days=backfill_window_days())
+        _seed_entry(
+            db,
+            employee_user,
+            edge,
+            items=[(str(uuid4()), "край окна", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        response = client.put(
+            f"/api/employee/daily/{_iso(edge)}",
+            headers=employee_headers,
+            json={"items": [{"text": "поправил на краю окна", "status": "done"}]},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "submitted"
+
+    def test_submitted_day_outside_window_is_closed(self, client, db, employee_headers, employee_user):
+        outside = TODAY - timedelta(days=backfill_window_days() + 1)
+        _seed_entry(
+            db,
+            employee_user,
+            outside,
+            items=[(str(uuid4()), "старое", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        response = client.put(
+            f"/api/employee/daily/{_iso(outside)}",
+            headers=employee_headers,
             json={"items": [{"text": "переписал историю", "status": "done"}]},
         )
+        assert response.status_code == 400
+
+    def test_submitted_past_day_resubmit_still_rejected(self, client, db, employee_headers, employee_user):
+        _seed_entry(
+            db,
+            employee_user,
+            YESTERDAY,
+            items=[(str(uuid4()), "вчерашнее", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        response = client.post(f"/api/employee/daily/{_iso(YESTERDAY)}/submit", headers=employee_headers)
         assert response.status_code == 400
 
     def test_draft_past_day_stays_editable(self, client, db, employee_headers, employee_user):
@@ -347,12 +393,40 @@ class TestChainPoints:
         assert [point["status"] for point in history] == ["in_progress", "blocked"]
 
 
-class TestEditableFrom:
+class TestEditableWindow:
     def test_day_view_returns_backfill_boundary(self, client, employee_headers, employee_user):
-        from app.services.daily_entries import backfill_window_days
-
         body = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
         assert body["editable_from"] == _iso(TODAY - timedelta(days=backfill_window_days()))
+
+    def test_today_is_editable(self, client, employee_headers, employee_user):
+        body = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
+        assert body["editable"] is True
+        assert body["editable_until"] == _iso(TODAY + timedelta(days=backfill_window_days()))
+
+    def test_submitted_past_day_inside_window_is_editable(self, client, db, employee_headers, employee_user):
+        _seed_entry(db, employee_user, YESTERDAY, items=[(str(uuid4()), "вчера", EntryItemStatus.DONE.value)])
+
+        body = client.get(f"/api/employee/daily/{_iso(YESTERDAY)}", headers=employee_headers).json()
+        assert body["entry"]["status"] == "submitted"
+        assert body["editable"] is True
+        assert body["editable_until"] == _iso(YESTERDAY + timedelta(days=backfill_window_days()))
+
+    def test_window_edge_day_is_editable(self, client, employee_headers, employee_user):
+        edge = TODAY - timedelta(days=backfill_window_days())
+        body = client.get(f"/api/employee/daily/{_iso(edge)}", headers=employee_headers).json()
+        assert body["editable"] is True
+        assert body["editable_until"] == _iso(TODAY)
+
+    def test_day_outside_window_is_not_editable(self, client, employee_headers, employee_user):
+        outside = TODAY - timedelta(days=backfill_window_days() + 1)
+        body = client.get(f"/api/employee/daily/{_iso(outside)}", headers=employee_headers).json()
+        assert body["editable"] is False
+        assert body["editable_until"] == _iso(outside + timedelta(days=backfill_window_days()))
+
+    def test_future_day_is_not_editable(self, client, employee_headers, employee_user):
+        future = TODAY + timedelta(days=1)
+        body = client.get(f"/api/employee/daily/{_iso(future)}", headers=employee_headers).json()
+        assert body["editable"] is False
 
 
 class TestBulkDaysOff:
@@ -413,7 +487,7 @@ class TestBulkDaysOff:
         view = client.get(f"/api/employee/daily/{_iso(YESTERDAY)}", headers=employee_headers).json()
         assert view["entry"] is None
 
-    def test_submitted_past_day_rejects_whole_batch(self, client, db, employee_headers, employee_user):
+    def test_submitted_past_day_inside_window_is_overwritten(self, client, db, employee_headers, employee_user):
         _seed_entry(db, employee_user, YESTERDAY, items=[(str(uuid4()), "работал", EntryItemStatus.DONE.value)])
         target = TODAY - timedelta(days=2)
 
@@ -422,9 +496,24 @@ class TestBulkDaysOff:
             headers=employee_headers,
             json={"dates": [_iso(target), _iso(YESTERDAY)], "day_type": "off"},
         )
+        assert response.status_code == 200
+        body = response.json()
+        assert [entry["date"] for entry in body] == [_iso(target), _iso(YESTERDAY)]
+        assert all(entry["day_type"] == "off" for entry in body)
+        assert all(entry["items"] == [] for entry in body)
+
+    def test_submitted_day_outside_window_rejects_whole_batch(self, client, db, employee_headers, employee_user):
+        outside = TODAY - timedelta(days=backfill_window_days() + 1)
+        _seed_entry(db, employee_user, outside, items=[(str(uuid4()), "давно", EntryItemStatus.DONE.value)])
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(outside), _iso(YESTERDAY)], "day_type": "off"},
+        )
         assert response.status_code == 400
 
-        view = client.get(f"/api/employee/daily/{_iso(target)}", headers=employee_headers).json()
+        view = client.get(f"/api/employee/daily/{_iso(YESTERDAY)}", headers=employee_headers).json()
         assert view["entry"] is None
 
     def test_work_day_type_rejected(self, client, employee_headers, employee_user):
