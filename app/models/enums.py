@@ -77,3 +77,14 @@ OPEN_ITEM_STATUSES: frozenset[str] = frozenset(
 CLOSED_ITEM_STATUSES: frozenset[str] = frozenset(
     {EntryItemStatus.DONE.value, EntryItemStatus.DROPPED.value}
 )
+
+
+class ActivityPeriod(str, Enum):
+    WEEK = "week"
+    MONTH = "month"
+
+
+class ChainOutcome(str, Enum):
+    OPEN = "open"
+    DONE = "done"
+    DROPPED = "dropped"
