@@ -21,31 +21,41 @@ from app.models import User as UserModel
 from app.models.enums import CLOSED_ITEM_STATUSES, DayState, EntryItemStatus, UserRole
 from app.services.daily_entries import chain_summaries
 from app.services.day_state import (
-    count_day_states,
+    completion_rate,
+    day_totals,
     is_employed_on,
     is_tracked_employee,
     resolve_day_state,
-    scheduled_employees,
 )
-from app.services.day_state import completion_rate as day_completion_rate
-from app.services.employee_statistics import STATISTICS_WINDOW_DAYS, completion_rate
 
 router = APIRouter()
 
+OVERVIEW_WINDOW_DAYS = 30
 TIMESERIES_DEFAULT_DAYS = 30
 TIMESERIES_MAX_DAYS = 366
 
 
-def _day_types_by_user(db: Session, window_start: date) -> dict[int, dict[date, str]]:
-    rows = (
-        db.query(DailyEntryModel.user_id, DailyEntryModel.date, DailyEntryModel.day_type)
-        .filter(DailyEntryModel.date >= window_start)
+def _entries_by_day(
+    db: Session,
+    employees: List[UserModel],
+    period_start: date,
+    period_end: date,
+) -> dict[date, dict[int, DailyEntryModel]]:
+    by_day: dict[date, dict[int, DailyEntryModel]] = defaultdict(dict)
+    if not employees:
+        return by_day
+    entries = (
+        db.query(DailyEntryModel)
+        .filter(
+            DailyEntryModel.user_id.in_([employee.id for employee in employees]),
+            DailyEntryModel.date >= period_start,
+            DailyEntryModel.date <= period_end,
+        )
         .all()
     )
-    by_user: dict[int, dict[date, str]] = defaultdict(dict)
-    for user_id, day, day_type in rows:
-        by_user[user_id][day] = day_type
-    return by_user
+    for entry in entries:
+        by_day[entry.date][entry.user_id] = entry
+    return by_day
 
 
 def _blocked_items_query(db: Session, since: date | None = None):
@@ -65,9 +75,13 @@ def get_admin_analytics_overview(
     _: UserModel = Depends(require_admin_user),
 ) -> AnalyticsOverview:
     today = date.today()
-    window_start = today - timedelta(days=STATISTICS_WINDOW_DAYS - 1)
+    window_start = today - timedelta(days=OVERVIEW_WINDOW_DAYS - 1)
 
-    employees = db.query(UserModel).filter(UserModel.role == UserRole.EMPLOYEE.value).all()
+    employees = [
+        user
+        for user in db.query(UserModel).filter(UserModel.role == UserRole.EMPLOYEE.value).all()
+        if is_tracked_employee(user)
+    ]
     departments_count = db.query(DepartmentModel).count()
     entries_count = db.query(DailyEntryModel).count()
     entries_today = db.query(DailyEntryModel).filter(DailyEntryModel.date == today).count()
@@ -78,12 +92,9 @@ def get_admin_analytics_overview(
     )
     blocked_items = _blocked_items_query(db, since=window_start).scalar() or 0
 
-    day_types = _day_types_by_user(db, window_start)
-    rates = [
-        rate
-        for employee in employees
-        if (rate := completion_rate(employee, day_types.get(employee.id, {}))) is not None
-    ]
+    totals = day_totals(employees, window_start, today, _entries_by_day(db, employees, window_start, today))
+    submitted = sum(total.counts[DayState.SUBMITTED] for total in totals)
+    working_employees = sum(total.working_employees for total in totals)
 
     return AnalyticsOverview(
         employees_count=len(employees),
@@ -93,7 +104,7 @@ def get_admin_analytics_overview(
         open_chains_count=open_chains_count,
         blocked_items_last_30_days=int(blocked_items),
         last_entry_at=last_entry_at,
-        completion_rate_last_30_days=round(sum(rates) / len(rates), 4) if rates else None,
+        completion_rate_last_30_days=completion_rate(submitted, working_employees),
     )
 
 
@@ -174,37 +185,19 @@ def get_analytics_timeseries(
         employees_query = employees_query.filter(UserModel.department_id == department_id)
     employees = employees_query.all()
 
-    entries_by_day: dict[date, dict[int, DailyEntryModel]] = defaultdict(dict)
-    if employees:
-        entries = (
-            db.query(DailyEntryModel)
-            .filter(
-                DailyEntryModel.user_id.in_([employee.id for employee in employees]),
-                DailyEntryModel.date >= period_start,
-                DailyEntryModel.date <= period_end,
-            )
-            .all()
+    entries_by_day = _entries_by_day(db, employees, period_start, period_end)
+    return [
+        AnalyticsTimeseriesPoint(
+            date=total.day,
+            working_employees=total.working_employees,
+            submitted=total.counts[DayState.SUBMITTED],
+            draft=total.counts[DayState.DRAFT],
+            missing=total.counts[DayState.MISSING],
+            off=total.counts[DayState.OFF],
+            completion_rate=completion_rate(total.counts[DayState.SUBMITTED], total.working_employees),
         )
-        for entry in entries:
-            entries_by_day[entry.date][entry.user_id] = entry
-
-    points: List[AnalyticsTimeseriesPoint] = []
-    for offset in range((period_end - period_start).days + 1):
-        day = period_start + timedelta(days=offset)
-        working = scheduled_employees(employees, day)
-        counts = count_day_states(working, day, entries_by_day.get(day, {}))
-        points.append(
-            AnalyticsTimeseriesPoint(
-                date=day,
-                working_employees=len(working),
-                submitted=counts[DayState.SUBMITTED],
-                draft=counts[DayState.DRAFT],
-                missing=counts[DayState.MISSING],
-                off=counts[DayState.OFF],
-                completion_rate=day_completion_rate(counts[DayState.SUBMITTED], len(working)),
-            )
-        )
-    return points
+        for total in day_totals(employees, period_start, period_end, entries_by_day)
+    ]
 
 
 @router.get("/today", response_model=List[TodayState])
