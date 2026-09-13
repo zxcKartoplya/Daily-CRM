@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 from app.models import DailyEntry, EntryItem
-from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus
+from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus, OffReason
 from app.services.daily_entries import backfill_window_days
 
 TODAY = date.today()
@@ -628,6 +628,210 @@ class TestEntriesList:
         )
         assert response.status_code == 200
         assert [entry["date"] for entry in response.json()] == [_iso(YESTERDAY)]
+
+    def _list(self, client, headers, **params):
+        response = client.get("/api/employee/daily", headers=headers, params=params)
+        assert response.status_code == 200
+        return response.json()
+
+    def _seed_items(self, db, entry, items):
+        for position, chain_id, text, item_status, link in items:
+            db.add(
+                EntryItem(
+                    entry_id=entry.id,
+                    chain_id=chain_id,
+                    text=text,
+                    status=item_status,
+                    link=link,
+                    position=position,
+                )
+            )
+        db.commit()
+        db.refresh(entry)
+        return entry
+
+    def test_items_carry_chain_fields(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        entry = _seed_entry(db, employee_user, YESTERDAY)
+        self._seed_items(db, entry, [(0, chain_id, "задача", EntryItemStatus.BLOCKED.value, "https://tracker/1")])
+
+        entries = self._list(client, employee_headers)
+        assert len(entries) == 1
+        [item] = entries[0]["items"]
+        assert item["chain_id"] == chain_id
+        assert item["text"] == "задача"
+        assert item["status"] == "blocked"
+        assert item["link"] == "https://tracker/1"
+        assert item["position"] == 0
+        assert isinstance(item["id"], int)
+
+    def test_all_entry_kinds_are_returned(self, client, db, employee_headers, employee_user):
+        submitted_day = TODAY - timedelta(days=1)
+        draft_day = TODAY - timedelta(days=2)
+        vacation_day = TODAY - timedelta(days=3)
+        other_day = TODAY - timedelta(days=4)
+        bare_off_day = TODAY - timedelta(days=5)
+        _seed_entry(db, employee_user, submitted_day, items=[(str(uuid4()), "сдано", EntryItemStatus.DONE.value)])
+        _seed_entry(
+            db,
+            employee_user,
+            draft_day,
+            status=DailyEntryStatus.DRAFT.value,
+            items=[(str(uuid4()), "черновик", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        vacation = _seed_entry(db, employee_user, vacation_day, day_type=DayType.OFF.value)
+        vacation.off_reason = OffReason.VACATION.value
+        other = _seed_entry(db, employee_user, other_day, day_type=DayType.OFF.value)
+        other.off_reason = OffReason.OTHER.value
+        other.off_reason_note = "переезд"
+        _seed_entry(db, employee_user, bare_off_day, day_type=DayType.OFF.value)
+        db.commit()
+
+        by_date = {entry["date"]: entry for entry in self._list(client, employee_headers)}
+        assert set(by_date) == {_iso(day) for day in (submitted_day, draft_day, vacation_day, other_day, bare_off_day)}
+
+        submitted = by_date[_iso(submitted_day)]
+        assert (submitted["day_type"], submitted["status"]) == ("work", "submitted")
+        assert submitted["submitted_at"] is not None
+        assert [item["text"] for item in submitted["items"]] == ["сдано"]
+
+        draft = by_date[_iso(draft_day)]
+        assert (draft["day_type"], draft["status"]) == ("work", "draft")
+        assert draft["submitted_at"] is None
+        assert [item["text"] for item in draft["items"]] == ["черновик"]
+
+        vacation_entry = by_date[_iso(vacation_day)]
+        assert vacation_entry["day_type"] == "off"
+        assert vacation_entry["off_reason"] == "vacation"
+        assert vacation_entry["off_reason_note"] is None
+        assert vacation_entry["items"] == []
+
+        other_entry = by_date[_iso(other_day)]
+        assert other_entry["off_reason"] == "other"
+        assert other_entry["off_reason_note"] == "переезд"
+
+        bare_off = by_date[_iso(bare_off_day)]
+        assert bare_off["day_type"] == "off"
+        assert bare_off["off_reason"] is None
+        assert bare_off["items"] == []
+
+    def test_entries_by_date_desc_and_items_by_position(self, client, db, employee_headers, employee_user):
+        for offset in (3, 1, 2):
+            entry = _seed_entry(db, employee_user, TODAY - timedelta(days=offset))
+            self._seed_items(
+                db,
+                entry,
+                [
+                    (2, str(uuid4()), "третий", EntryItemStatus.DONE.value, None),
+                    (0, str(uuid4()), "первый", EntryItemStatus.IN_PROGRESS.value, None),
+                    (1, str(uuid4()), "второй", EntryItemStatus.BLOCKED.value, None),
+                ],
+            )
+
+        entries = self._list(client, employee_headers)
+        assert [entry["date"] for entry in entries] == [_iso(TODAY - timedelta(days=offset)) for offset in (1, 2, 3)]
+        for entry in entries:
+            assert [item["position"] for item in entry["items"]] == [0, 1, 2]
+            assert [item["text"] for item in entry["items"]] == ["первый", "второй", "третий"]
+
+    def test_range_bounds_are_inclusive(self, client, db, employee_headers, employee_user):
+        date_from = TODAY - timedelta(days=6)
+        date_to = TODAY - timedelta(days=2)
+        for day in (date_from - timedelta(days=1), date_from, date_to, date_to + timedelta(days=1)):
+            _seed_entry(db, employee_user, day, day_type=DayType.OFF.value)
+
+        entries = self._list(client, employee_headers, date_from=_iso(date_from), date_to=_iso(date_to))
+        assert [entry["date"] for entry in entries] == [_iso(date_to), _iso(date_from)]
+
+    def test_no_hidden_depth_limit(self, client, db, employee_headers, employee_user):
+        quarter_ago = TODAY - timedelta(days=90)
+        long_ago = TODAY - timedelta(days=400)
+        _seed_entry(db, employee_user, YESTERDAY, items=[(str(uuid4()), "вчера", EntryItemStatus.DONE.value)])
+        _seed_entry(db, employee_user, quarter_ago, items=[(str(uuid4()), "квартал", EntryItemStatus.DONE.value)])
+        _seed_entry(db, employee_user, long_ago, items=[(str(uuid4()), "давно", EntryItemStatus.DONE.value)])
+        expected = [_iso(YESTERDAY), _iso(quarter_ago), _iso(long_ago)]
+
+        assert [entry["date"] for entry in self._list(client, employee_headers)] == expected
+        assert [
+            entry["date"] for entry in self._list(client, employee_headers, date_from=_iso(long_ago), date_to=_iso(TODAY))
+        ] == expected
+        assert [entry["date"] for entry in self._list(client, employee_headers, date_from=_iso(quarter_ago))] == expected[:2]
+
+    def test_only_date_to_filters_upper_bound(self, client, db, employee_headers, employee_user):
+        long_ago = TODAY - timedelta(days=400)
+        for day in (YESTERDAY, TODAY - timedelta(days=5), long_ago):
+            _seed_entry(db, employee_user, day, day_type=DayType.OFF.value)
+
+        entries = self._list(client, employee_headers, date_to=_iso(TODAY - timedelta(days=5)))
+        assert [entry["date"] for entry in entries] == [_iso(TODAY - timedelta(days=5)), _iso(long_ago)]
+
+    def test_inverted_range_returns_empty_list(self, client, db, employee_headers, employee_user):
+        for offset in (1, 2, 3):
+            _seed_entry(db, employee_user, TODAY - timedelta(days=offset), day_type=DayType.OFF.value)
+
+        entries = self._list(
+            client,
+            employee_headers,
+            date_from=_iso(TODAY - timedelta(days=1)),
+            date_to=_iso(TODAY - timedelta(days=3)),
+        )
+        assert entries == []
+
+    def test_other_users_entries_and_edited_at_are_hidden(self, client, db, employee_headers, employee_user, admin_user):
+        own = _seed_entry(db, employee_user, YESTERDAY, items=[(str(uuid4()), "своё", EntryItemStatus.DONE.value)])
+        own.edited_at = datetime.utcnow()
+        _seed_entry(db, admin_user, YESTERDAY, items=[(str(uuid4()), "чужое", EntryItemStatus.DONE.value)])
+        _seed_entry(db, admin_user, TODAY - timedelta(days=2), day_type=DayType.OFF.value)
+        db.commit()
+
+        entries = self._list(client, employee_headers)
+        assert [(entry["date"], entry["user_id"]) for entry in entries] == [(_iso(YESTERDAY), employee_user.id)]
+        assert [item["text"] for item in entries[0]["items"]] == ["своё"]
+        assert "edited_at" not in entries[0]
+
+    def test_chain_across_period_is_restored_by_chain_id(self, client, db, employee_headers, employee_user):
+        long_chain = str(uuid4())
+        short_chain = str(uuid4())
+        first_day = TODAY - timedelta(days=4)
+        _seed_entry(
+            db,
+            employee_user,
+            first_day,
+            items=[(long_chain, "интеграция", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        _seed_entry(
+            db,
+            employee_user,
+            TODAY - timedelta(days=3),
+            items=[
+                (short_chain, "созвон", EntryItemStatus.DONE.value),
+                (long_chain, "жду доступы", EntryItemStatus.BLOCKED.value),
+            ],
+        )
+        _seed_entry(db, employee_user, TODAY - timedelta(days=2), day_type=DayType.OFF.value)
+        _seed_entry(
+            db,
+            employee_user,
+            YESTERDAY,
+            items=[(long_chain, "интеграция готова", EntryItemStatus.DONE.value)],
+        )
+
+        entries = self._list(client, employee_headers, date_from=_iso(first_day), date_to=_iso(YESTERDAY))
+
+        lines: dict[str, list[tuple[str, str, str, int]]] = {}
+        for entry in sorted(entries, key=lambda entry: entry["date"]):
+            for item in entry["items"]:
+                lines.setdefault(item["chain_id"], []).append(
+                    (entry["date"], item["status"], item["text"], item["position"])
+                )
+
+        assert lines[long_chain] == [
+            (_iso(first_day), "in_progress", "интеграция", 0),
+            (_iso(TODAY - timedelta(days=3)), "blocked", "жду доступы", 1),
+            (_iso(YESTERDAY), "done", "интеграция готова", 0),
+        ]
+        assert lines[short_chain] == [(_iso(TODAY - timedelta(days=3)), "done", "созвон", 0)]
+        assert set(lines) == {long_chain, short_chain}
 
 
 class TestChainsAfterBackfill:
