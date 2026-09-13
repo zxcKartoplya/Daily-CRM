@@ -612,3 +612,198 @@ class TestEntriesList:
         )
         assert response.status_code == 200
         assert [entry["date"] for entry in response.json()] == [_iso(YESTERDAY)]
+
+
+class TestChainsAfterBackfill:
+    def test_chain_reopened_in_past_day_comes_back_to_today(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "добил", EntryItemStatus.DONE.value)])
+        assert client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"] == []
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(YESTERDAY)}",
+            headers=employee_headers,
+            json={"items": [{"chain_id": chain_id, "text": "ещё не добил", "status": "in_progress"}]},
+        )
+        assert response.status_code == 200
+
+        chains = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"]
+        assert [chain["chain_id"] for chain in chains] == [chain_id]
+        assert chains[0]["last_status"] == "in_progress"
+        assert chains[0]["last_date"] == _iso(YESTERDAY)
+        assert chains[0]["history"] == [{"date": _iso(YESTERDAY), "status": "in_progress"}]
+
+        history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
+        assert history["last_status"] == "in_progress"
+
+    def test_chain_closed_in_past_day_stays_open_by_later_item(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "делаю", EntryItemStatus.IN_PROGRESS.value)])
+        client.put(
+            f"/api/employee/daily/{_iso(TODAY)}",
+            headers=employee_headers,
+            json={"items": [{"chain_id": chain_id, "text": "продолжаю", "status": "in_progress"}]},
+        )
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(YESTERDAY)}",
+            headers=employee_headers,
+            json={"items": [{"chain_id": chain_id, "text": "вообще-то закрыл", "status": "done"}]},
+        )
+        assert response.status_code == 200
+
+        view = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()
+        assert view["open_chains"] == []
+        assert [(item["chain_id"], item["status"]) for item in view["entry"]["items"]] == [(chain_id, "in_progress")]
+
+        history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
+        assert history["last_status"] == "in_progress"
+        assert history["last_date"] == _iso(TODAY)
+        assert [(item["date"], item["status"]) for item in history["items"]] == [
+            (_iso(YESTERDAY), "done"),
+            (_iso(TODAY), "in_progress"),
+        ]
+
+        statistics = client.get("/api/employee/statistics", headers=employee_headers).json()
+        assert statistics["open_chains_count"] == 1
+
+    def test_removing_first_item_shortens_chain(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        first_day = TODAY - timedelta(days=3)
+        second_day = TODAY - timedelta(days=2)
+        _seed_entry(db, employee_user, first_day, items=[(chain_id, "начал", EntryItemStatus.IN_PROGRESS.value)])
+        _seed_entry(db, employee_user, second_day, items=[(chain_id, "продолжил", EntryItemStatus.IN_PROGRESS.value)])
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "жду", EntryItemStatus.BLOCKED.value)])
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(first_day)}",
+            headers=employee_headers,
+            json={"items": [{"text": "на самом деле занимался другим", "status": "done"}]},
+        )
+        assert response.status_code == 200
+        assert all(item["chain_id"] != chain_id for item in response.json()["items"])
+
+        chain = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"][0]
+        assert chain["chain_id"] == chain_id
+        assert chain["days_open"] == 3
+        assert chain["title"] == "продолжил"
+        assert [point["date"] for point in chain["history"]] == [_iso(second_day), _iso(YESTERDAY)]
+
+        history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
+        assert history["first_date"] == _iso(second_day)
+        assert [item["date"] for item in history["items"]] == [_iso(second_day), _iso(YESTERDAY)]
+
+    def test_removing_only_item_drops_chain(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "единственный", EntryItemStatus.IN_PROGRESS.value)])
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(YESTERDAY)}",
+            headers=employee_headers,
+            json={"items": [{"text": "совсем другое", "status": "done"}]},
+        )
+        assert response.status_code == 200
+
+        assert client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"] == []
+        assert client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).status_code == 404
+        assert client.get("/api/employee/statistics", headers=employee_headers).json()["open_chains_count"] == 0
+
+    def test_chain_extended_back_starts_from_new_first_day(self, client, db, employee_headers, employee_user):
+        chain_id = str(uuid4())
+        earlier = TODAY - timedelta(days=3)
+        started = TODAY - timedelta(days=2)
+        _seed_entry(db, employee_user, started, items=[(chain_id, "начал", EntryItemStatus.IN_PROGRESS.value)])
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "продолжил", EntryItemStatus.IN_PROGRESS.value)])
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(earlier)}",
+            headers=employee_headers,
+            json={"items": [{"chain_id": chain_id, "text": "на самом деле начал раньше", "status": "in_progress"}]},
+        )
+        assert response.status_code == 200
+
+        chain = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"][0]
+        assert chain["days_open"] == 4
+        assert chain["title"] == "на самом деле начал раньше"
+        assert chain["last_text"] == "продолжил"
+        assert [point["date"] for point in chain["history"]] == [_iso(earlier), _iso(started), _iso(YESTERDAY)]
+
+        history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
+        assert history["first_date"] == _iso(earlier)
+        assert [item["date"] for item in history["items"]] == [_iso(earlier), _iso(started), _iso(YESTERDAY)]
+
+    def test_chain_started_today_extended_back_appears_in_open_chains(self, client, employee_headers, employee_user):
+        started = client.put(
+            f"/api/employee/daily/{_iso(TODAY)}",
+            headers=employee_headers,
+            json={"items": [{"text": "сегодня начал", "status": "in_progress"}]},
+        ).json()
+        chain_id = started["items"][0]["chain_id"]
+        earlier = TODAY - timedelta(days=2)
+
+        response = client.put(
+            f"/api/employee/daily/{_iso(earlier)}",
+            headers=employee_headers,
+            json={"items": [{"chain_id": chain_id, "text": "вообще-то позавчера", "status": "in_progress"}]},
+        )
+        assert response.status_code == 200
+
+        chains = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"]
+        assert [chain["chain_id"] for chain in chains] == [chain_id]
+        assert chains[0]["days_open"] == 3
+
+    def test_bulk_day_off_removes_day_from_passing_chains(self, client, db, employee_headers, employee_user):
+        _all_week(db, employee_user)
+        chain_id = str(uuid4())
+        only_there = str(uuid4())
+        first_day = TODAY - timedelta(days=3)
+        middle_day = TODAY - timedelta(days=2)
+        _seed_entry(db, employee_user, first_day, items=[(chain_id, "начал", EntryItemStatus.IN_PROGRESS.value)])
+        _seed_entry(
+            db,
+            employee_user,
+            middle_day,
+            items=[
+                (chain_id, "середина", EntryItemStatus.IN_PROGRESS.value),
+                (only_there, "только тут", EntryItemStatus.IN_PROGRESS.value),
+            ],
+        )
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "жду", EntryItemStatus.BLOCKED.value)])
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(middle_day)], "day_type": "off"},
+        )
+        assert response.status_code == 200
+
+        chains = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"]
+        assert [chain["chain_id"] for chain in chains] == [chain_id]
+        assert chains[0]["days_open"] == 4
+        assert chains[0]["last_status"] == "blocked"
+        assert [point["date"] for point in chains[0]["history"]] == [_iso(first_day), _iso(YESTERDAY)]
+
+        history = client.get(f"/api/employee/daily-chains/{chain_id}", headers=employee_headers).json()
+        assert [item["date"] for item in history["items"]] == [_iso(first_day), _iso(YESTERDAY)]
+        assert client.get(f"/api/employee/daily-chains/{only_there}", headers=employee_headers).status_code == 404
+        assert client.get("/api/employee/statistics", headers=employee_headers).json()["open_chains_count"] == 1
+
+    def test_bulk_day_off_on_last_day_falls_back_to_previous_item(self, client, db, employee_headers, employee_user):
+        _all_week(db, employee_user)
+        chain_id = str(uuid4())
+        first_day = TODAY - timedelta(days=2)
+        _seed_entry(db, employee_user, first_day, items=[(chain_id, "начал", EntryItemStatus.IN_PROGRESS.value)])
+        _seed_entry(db, employee_user, YESTERDAY, items=[(chain_id, "закрыл", EntryItemStatus.DONE.value)])
+        assert client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"] == []
+
+        response = client.put(
+            "/api/employee/daily-bulk",
+            headers=employee_headers,
+            json={"dates": [_iso(YESTERDAY)], "day_type": "off"},
+        )
+        assert response.status_code == 200
+
+        chains = client.get(f"/api/employee/daily/{_iso(TODAY)}", headers=employee_headers).json()["open_chains"]
+        assert [chain["chain_id"] for chain in chains] == [chain_id]
+        assert chains[0]["last_date"] == _iso(first_day)
+        assert chains[0]["last_status"] == "in_progress"
