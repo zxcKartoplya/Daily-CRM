@@ -11,12 +11,14 @@ from app.api.schemas.reviewer import (
     ReviewerCreate,
     ReviewerDescriptionRequest,
     ReviewerDescriptionResponse,
+    ReviewerUsage,
     ReviewerWithJobs,
     ReviewerUpdate,
 )
 from app.db.session import get_db
 from app.models import Reviewer as ReviewerModel
 from app.models import Job as JobModel
+from app.services.assessments import calculate_reviewer_usage
 from app.services.gigachat import GigaChatClient
 
 
@@ -66,6 +68,19 @@ def get_reviewer(reviewer_id: int, db: Session = Depends(get_db)) -> ReviewerWit
     if not reviewer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
     return _to_reviewer_with_jobs(reviewer)
+
+
+@router.get("/{reviewer_id}/usage", response_model=ReviewerUsage)
+def get_reviewer_usage(reviewer_id: int, db: Session = Depends(get_db)) -> ReviewerUsage:
+    reviewer = (
+        db.query(ReviewerModel)
+        .options(joinedload(ReviewerModel.jobs))
+        .filter(ReviewerModel.id == reviewer_id)
+        .first()
+    )
+    if not reviewer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reviewer not found")
+    return calculate_reviewer_usage(db, reviewer)
 
 
 @router.post("", response_model=Reviewer, status_code=status.HTTP_201_CREATED)

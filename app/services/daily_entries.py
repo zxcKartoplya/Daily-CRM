@@ -20,7 +20,14 @@ from app.core.config import get_settings
 from app.models import DailyEntry as DailyEntryModel
 from app.models import EntryItem as EntryItemModel
 from app.models import User as UserModel
-from app.models.enums import OPEN_ITEM_STATUSES, DailyEntryStatus, DayType
+from app.models.enums import (
+    OFF_REASON_LABELS,
+    OPEN_ITEM_STATUSES,
+    DailyEntryStatus,
+    DayType,
+    OffReason,
+    off_reason_requires_note,
+)
 from app.services.schedule import working_days_in_range
 
 ChainRows = list[tuple[EntryItemModel, date]]
@@ -32,6 +39,15 @@ def backfill_window_days() -> int:
 
 def earliest_editable_date(today: date) -> date:
     return today - timedelta(days=backfill_window_days())
+
+
+def last_editable_date(day: date) -> date:
+    return day + timedelta(days=backfill_window_days())
+
+
+def is_editable(day: date, today: date | None = None) -> bool:
+    reference = date.today() if today is None else today
+    return earliest_editable_date(reference) <= day <= reference
 
 
 def get_entry(db: Session, user_id: int, day: date) -> DailyEntryModel | None:
@@ -63,7 +79,7 @@ def list_entries(
     return query.all()
 
 
-def _ensure_writable(entry: DailyEntryModel | None, day: date) -> None:
+def _ensure_writable(day: date) -> None:
     today = date.today()
     if day > today:
         raise HTTPException(
@@ -71,18 +87,41 @@ def _ensure_writable(entry: DailyEntryModel | None, day: date) -> None:
             detail="Дейлик за будущую дату не заполняется",
         )
 
-    window = backfill_window_days()
-    if day < earliest_editable_date(today):
+    if not is_editable(day, today):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Заполнить задним числом можно в пределах {window} дней",
+            detail=f"Заполнить задним числом можно в пределах {backfill_window_days()} дней",
         )
 
-    if entry is not None and entry.status == DailyEntryStatus.SUBMITTED.value and day < today:
+
+def _off_reason_fields(
+    day_type: DayType,
+    off_reason: OffReason | None,
+    note: str | None,
+) -> tuple[str | None, str | None]:
+    note = (note or "").strip() or None
+    if day_type is DayType.WORK:
+        if off_reason is not None or note is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Причина указывается только для нерабочего дня",
+            )
+        return None, None
+
+    if off_reason is not None and off_reason_requires_note(off_reason):
+        if note is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Для причины «{OFF_REASON_LABELS[off_reason]}» нужен комментарий",
+            )
+        return off_reason.value, note
+
+    if note is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Отправленная запись прошлого дня закрыта на изменения",
+            detail=f"Комментарий указывается только для причины «{OFF_REASON_LABELS[OffReason.OTHER]}»",
         )
+    return (off_reason.value if off_reason is not None else None), None
 
 
 def _ordered_items(items: list[EntryItemInput]) -> list[tuple[int, EntryItemInput]]:
@@ -153,9 +192,30 @@ def _replace_items(db: Session, entry: DailyEntryModel, ordered: list[tuple[int,
             db.delete(item)
 
 
+def _entry_content(entry: DailyEntryModel) -> tuple:
+    items = sorted(entry.items, key=lambda item: (item.position, item.chain_id))
+    return (
+        entry.day_type,
+        entry.off_reason,
+        entry.off_reason_note,
+        tuple((item.chain_id, item.text, item.status, item.link, item.position) for item in items),
+    )
+
+
+def _submitted_content(entry: DailyEntryModel | None) -> tuple | None:
+    if entry is None or entry.status != DailyEntryStatus.SUBMITTED.value:
+        return None
+    return _entry_content(entry)
+
+
+def _mark_edited(entry: DailyEntryModel, content_before: tuple | None) -> None:
+    if content_before is not None and _entry_content(entry) != content_before:
+        entry.edited_at = datetime.utcnow()
+
+
 def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWrite) -> DailyEntryModel:
     entry = get_entry(db, user.id, day)
-    _ensure_writable(entry, day)
+    _ensure_writable(day)
 
     if payload.day_type is DayType.OFF and payload.items:
         raise HTTPException(
@@ -163,8 +223,21 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
             detail="У нерабочего дня не может быть пунктов",
         )
 
+    if (
+        entry is not None
+        and entry.status == DailyEntryStatus.SUBMITTED.value
+        and payload.day_type is DayType.WORK
+        and not payload.items
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя оставить отправленный рабочий день без пунктов",
+        )
+
+    off_reason, off_reason_note = _off_reason_fields(payload.day_type, payload.off_reason, payload.off_reason_note)
     ordered = _ordered_items(payload.items)
     _validate_items(db, user.id, ordered)
+    content_before = _submitted_content(entry)
 
     if entry is None:
         entry = DailyEntryModel(
@@ -179,7 +252,10 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
     else:
         entry.day_type = payload.day_type.value
 
+    entry.off_reason = off_reason
+    entry.off_reason_note = off_reason_note
     _replace_items(db, entry, ordered)
+    _mark_edited(entry, content_before)
     db.flush()
     return entry
 
@@ -189,7 +265,7 @@ def submit_entry(db: Session, user: UserModel, day: date) -> DailyEntryModel:
     if entry is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись за эту дату не найдена")
 
-    _ensure_writable(entry, day)
+    _ensure_writable(day)
 
     if entry.status == DailyEntryStatus.SUBMITTED.value:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Запись уже отправлена")
@@ -217,6 +293,8 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
     if not days:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список дат пуст")
 
+    off_reason, off_reason_note = _off_reason_fields(payload.day_type, payload.off_reason, payload.off_reason_note)
+
     existing = {
         entry.date: entry
         for entry in db.query(DailyEntryModel)
@@ -226,11 +304,12 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
     }
 
     for day in days:
-        _ensure_writable(existing.get(day), day)
+        _ensure_writable(day)
 
     entries: list[DailyEntryModel] = []
     for day in days:
         entry = existing.get(day)
+        content_before = _submitted_content(entry)
         if entry is None:
             entry = DailyEntryModel(
                 user_id=user.id,
@@ -243,8 +322,12 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
             _replace_items(db, entry, [])
 
         entry.day_type = DayType.OFF.value
+        entry.off_reason = off_reason
+        entry.off_reason_note = off_reason_note
+        _mark_edited(entry, content_before)
+        if content_before is None:
+            entry.submitted_at = datetime.utcnow()
         entry.status = DailyEntryStatus.SUBMITTED.value
-        entry.submitted_at = datetime.utcnow()
         entries.append(entry)
 
     db.flush()
@@ -268,6 +351,23 @@ def chain_rows(
     if chain_id is not None:
         query = query.filter(EntryItemModel.chain_id == chain_id)
     return query.order_by(DailyEntryModel.date.asc(), EntryItemModel.position.asc()).all()
+
+
+def chain_rows_by_user(db: Session, user_ids: list[int]) -> dict[int, ChainRows]:
+    result: dict[int, ChainRows] = {user_id: [] for user_id in user_ids}
+    if not user_ids:
+        return result
+
+    rows = (
+        db.query(EntryItemModel, DailyEntryModel.date, DailyEntryModel.user_id)
+        .join(DailyEntryModel, EntryItemModel.entry_id == DailyEntryModel.id)
+        .filter(DailyEntryModel.user_id.in_(user_ids))
+        .order_by(DailyEntryModel.user_id.asc(), DailyEntryModel.date.asc(), EntryItemModel.position.asc())
+        .all()
+    )
+    for item, day, user_id in rows:
+        result[user_id].append((item, day))
+    return result
 
 
 def chain_summaries(db: Session, *, department_id: int | None = None) -> list[tuple[int, int | None, str, str]]:
@@ -359,11 +459,14 @@ def missing_days(db: Session, user: UserModel, day: date) -> list[date]:
 
 
 def day_view(db: Session, user: UserModel, day: date) -> DayView:
+    today = date.today()
     return DayView(
         entry=get_entry(db, user.id, day),
         open_chains=open_chains(db, user.id, day),
         missing_days=missing_days(db, user, day),
-        editable_from=earliest_editable_date(date.today()),
+        editable_from=earliest_editable_date(today),
+        editable=is_editable(day, today),
+        editable_until=last_editable_date(day),
     )
 
 

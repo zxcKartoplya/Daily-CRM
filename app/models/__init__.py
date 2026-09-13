@@ -1,3 +1,4 @@
+from app.models.assessment import Assessment  # noqa: F401
 from app.models.daily_entry import DailyEntry  # noqa: F401
 from app.models.entry_item import EntryItem  # noqa: F401
 from app.models.department import Department  # noqa: F401

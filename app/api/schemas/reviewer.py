@@ -1,5 +1,7 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 from typing import List
+
+from pydantic import BaseModel, ConfigDict
 
 
 class Metric(BaseModel):
@@ -51,3 +53,27 @@ class ReviewerDescriptionData(BaseModel):
 
 class ReviewerDescriptionResponse(BaseModel):
     gigachat_response: ReviewerDescriptionData
+
+
+class ReviewerUsageMonth(BaseModel):
+    month: str
+    count: int
+
+
+class ReviewerUsageMetric(BaseModel):
+    json_name: str
+    display_name: str
+    avg_score: float
+    samples: int
+
+
+class ReviewerUsage(BaseModel):
+    reviewer_id: int
+    assessments_count: int
+    assessments_last_30_days: int
+    last_assessment_at: datetime | None = None
+    workers_evaluated: int
+    jobs_count: int
+    employees_covered: int
+    by_month: List[ReviewerUsageMonth] = []
+    avg_scores: List[ReviewerUsageMetric] = []

@@ -80,3 +80,12 @@ class TestEmployeeStatistics:
 
         body = client.get("/api/employee/statistics", headers=employee_headers).json()
         assert body["completion_rate"] == 0.25
+
+    def test_completion_rate_is_fraction_of_window(self, client, db, employee_headers, employee_user):
+        _all_week(db, employee_user)
+        for offset in range(12):
+            _seed_entry(db, employee_user, TODAY - timedelta(days=offset))
+
+        rate = client.get("/api/employee/statistics", headers=employee_headers).json()["completion_rate"]
+        assert rate == 0.4
+        assert 0 <= rate <= 1

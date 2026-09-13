@@ -6,11 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.daily_entry import (
-    DepartmentDailies,
-    DepartmentDailyDay,
-    DepartmentDailyEmployee,
-)
+from app.api.schemas.daily_entry import DepartmentDailies, DepartmentDailyEmployee
 from app.api.schemas.department import Department, DepartmentCreate, DepartmentUpdate
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
@@ -18,7 +14,9 @@ from app.models import Department as DepartmentModel
 from app.models import Job as JobModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
-from app.services.schedule import is_working_day
+from app.services.daily_entries import chain_rows_by_user
+from app.services.dailies_grid import build_daily_days, project_daily_stats
+from app.services.worker_statistics import calculate_worker_statistics, days_in_range
 
 
 router = APIRouter()
@@ -56,6 +54,14 @@ def _get_department_or_404(db: Session, department_id: int) -> DepartmentModel:
     if not department:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
     return department
+
+
+def _entries_in_period(
+    entries: list[DailyEntryModel],
+    period_start: date,
+    period_end: date,
+) -> dict[date, DailyEntryModel]:
+    return {entry.date: entry for entry in entries if period_start <= entry.date <= period_end}
 
 
 @router.get("", response_model=List[Department])
@@ -173,25 +179,26 @@ def get_department_dailies(
 
     employees = (
         db.query(UserModel)
+        .options(joinedload(UserModel.job))
         .filter(UserModel.department_id == department_id, UserModel.role == UserRole.EMPLOYEE.value)
         .order_by(UserModel.name.asc())
         .all()
     )
+    employee_ids = [employee.id for employee in employees]
     entries = (
         db.query(DailyEntryModel)
         .options(joinedload(DailyEntryModel.items))
-        .filter(
-            DailyEntryModel.user_id.in_([employee.id for employee in employees] or [0]),
-            DailyEntryModel.date >= period_start,
-            DailyEntryModel.date <= period_end,
-        )
+        .filter(DailyEntryModel.user_id.in_(employee_ids or [0]))
+        .order_by(DailyEntryModel.date.asc())
         .all()
     )
-    by_user: dict[int, dict[date, DailyEntryModel]] = {}
+    entries_by_user: dict[int, list[DailyEntryModel]] = {}
     for entry in entries:
-        by_user.setdefault(entry.user_id, {})[entry.date] = entry
+        entries_by_user.setdefault(entry.user_id, []).append(entry)
+    chains_by_user = chain_rows_by_user(db, employee_ids)
 
-    period = [period_start + timedelta(days=offset) for offset in range((period_end - period_start).days + 1)]
+    period = days_in_range(period_start, period_end)
+    today = date.today()
 
     return DepartmentDailies(
         department_id=department.id,
@@ -202,16 +209,25 @@ def get_department_dailies(
             DepartmentDailyEmployee(
                 user_id=employee.id,
                 user_name=employee.name,
+                job_id=employee.job.id if employee.job else None,
+                job_name=employee.job.name if employee.job else None,
                 schedule_type=employee.schedule_type,
                 work_days=employee.work_days,
-                days=[
-                    DepartmentDailyDay(
-                        date=day,
-                        is_working_day=is_working_day(employee, day),
-                        entry=by_user.get(employee.id, {}).get(day),
+                stats=project_daily_stats(
+                    calculate_worker_statistics(
+                        employee,
+                        period_from=period_start,
+                        period_to=period_end,
+                        entries=entries_by_user.get(employee.id, []),
+                        chain_rows=chains_by_user[employee.id],
+                        today=today,
                     )
-                    for day in period
-                ],
+                ),
+                days=build_daily_days(
+                    employee,
+                    period,
+                    _entries_in_period(entries_by_user.get(employee.id, []), period_start, period_end),
+                ),
             )
             for employee in employees
         ],

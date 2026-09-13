@@ -1,9 +1,11 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus, ScheduleType
+from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus, OffReason, ScheduleType
+
+OFF_REASON_NOTE_MAX_LENGTH = 200
 
 
 class EntryItemInput(BaseModel):
@@ -27,12 +29,16 @@ class EntryItem(BaseModel):
 
 class DailyEntryWrite(BaseModel):
     day_type: DayType = DayType.WORK
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = Field(default=None, max_length=OFF_REASON_NOTE_MAX_LENGTH)
     items: list[EntryItemInput] = []
 
 
 class BulkDayTypeWrite(BaseModel):
     dates: list[date]
     day_type: DayType = DayType.OFF
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = Field(default=None, max_length=OFF_REASON_NOTE_MAX_LENGTH)
 
 
 class DailyEntry(BaseModel):
@@ -41,11 +47,17 @@ class DailyEntry(BaseModel):
     department_id: int | None = None
     date: date
     day_type: DayType
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = None
     status: DailyEntryStatus
     submitted_at: datetime | None = None
     items: list[EntryItem] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminDailyEntry(DailyEntry):
+    edited_at: datetime | None = None
 
 
 class ChainPoint(BaseModel):
@@ -69,6 +81,8 @@ class DayView(BaseModel):
     open_chains: list[OpenChain] = []
     missing_days: list[date] = []
     editable_from: date
+    editable: bool
+    editable_until: date
 
 
 class ChainItem(BaseModel):
@@ -93,14 +107,29 @@ class ChainHistory(BaseModel):
 class DepartmentDailyDay(BaseModel):
     date: date
     is_working_day: bool
-    entry: DailyEntry | None = None
+    entry: AdminDailyEntry | None = None
+
+
+class DepartmentDailyStats(BaseModel):
+    working_days: int
+    submitted: int
+    draft: int
+    missing: int
+    off: int
+    completion_rate: float | None = None
+    streak: int
+    blockers: int
+    done_items: int
 
 
 class DepartmentDailyEmployee(BaseModel):
     user_id: int
     user_name: str
+    job_id: int | None = None
+    job_name: str | None = None
     schedule_type: ScheduleType
     work_days: list[int] | None = None
+    stats: DepartmentDailyStats
     days: list[DepartmentDailyDay] = []
 
 
@@ -110,3 +139,15 @@ class DepartmentDailies(BaseModel):
     date_from: date
     date_to: date
     employees: list[DepartmentDailyEmployee] = []
+
+
+class WorkerDailies(BaseModel):
+    user_id: int
+    user_name: str
+    job_name: str | None = None
+    department_name: str | None = None
+    schedule_type: ScheduleType
+    work_days: list[int] | None = None
+    date_from: date
+    date_to: date
+    days: list[DepartmentDailyDay] = []

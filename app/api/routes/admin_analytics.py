@@ -2,22 +2,38 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.analytics import AnalyticsOverview, DepartmentAnalytics
+from app.api.schemas.analytics import (
+    AnalyticsOverview,
+    AnalyticsTimeseriesPoint,
+    DepartmentAnalytics,
+    TodayState,
+)
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
 from app.models import Department as DepartmentModel
 from app.models import EntryItem as EntryItemModel
 from app.models import User as UserModel
-from app.models.enums import CLOSED_ITEM_STATUSES, EntryItemStatus, UserRole
+from app.models.enums import CLOSED_ITEM_STATUSES, DayState, EntryItemStatus, UserRole
 from app.services.daily_entries import chain_summaries
+from app.services.day_state import (
+    count_day_states,
+    is_employed_on,
+    is_tracked_employee,
+    resolve_day_state,
+    scheduled_employees,
+)
+from app.services.day_state import completion_rate as day_completion_rate
 from app.services.employee_statistics import STATISTICS_WINDOW_DAYS, completion_rate
 
 router = APIRouter()
+
+TIMESERIES_DEFAULT_DAYS = 30
+TIMESERIES_MAX_DAYS = 366
 
 
 def _day_types_by_user(db: Session, window_start: date) -> dict[int, dict[date, str]]:
@@ -122,3 +138,122 @@ def get_department_analytics(
         )
         for department in departments
     ]
+
+
+def _resolve_period(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    period_end = date_to or date.today()
+    period_start = date_from or period_end - timedelta(days=TIMESERIES_DEFAULT_DAYS - 1)
+    if period_start > period_end:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="date_from не может быть позже date_to",
+        )
+    if (period_end - period_start).days + 1 > TIMESERIES_MAX_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"период не может быть длиннее {TIMESERIES_MAX_DAYS} дней",
+        )
+    return period_start, period_end
+
+
+@router.get("/timeseries", response_model=List[AnalyticsTimeseriesPoint])
+def get_analytics_timeseries(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    department_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(require_admin_user),
+) -> List[AnalyticsTimeseriesPoint]:
+    period_start, period_end = _resolve_period(date_from, date_to)
+
+    if department_id is not None and db.get(DepartmentModel, department_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+
+    employees_query = db.query(UserModel).filter(UserModel.role == UserRole.EMPLOYEE.value)
+    if department_id is not None:
+        employees_query = employees_query.filter(UserModel.department_id == department_id)
+    employees = employees_query.all()
+
+    entries_by_day: dict[date, dict[int, DailyEntryModel]] = defaultdict(dict)
+    if employees:
+        entries = (
+            db.query(DailyEntryModel)
+            .filter(
+                DailyEntryModel.user_id.in_([employee.id for employee in employees]),
+                DailyEntryModel.date >= period_start,
+                DailyEntryModel.date <= period_end,
+            )
+            .all()
+        )
+        for entry in entries:
+            entries_by_day[entry.date][entry.user_id] = entry
+
+    points: List[AnalyticsTimeseriesPoint] = []
+    for offset in range((period_end - period_start).days + 1):
+        day = period_start + timedelta(days=offset)
+        working = scheduled_employees(employees, day)
+        counts = count_day_states(working, day, entries_by_day.get(day, {}))
+        points.append(
+            AnalyticsTimeseriesPoint(
+                date=day,
+                working_employees=len(working),
+                submitted=counts[DayState.SUBMITTED],
+                draft=counts[DayState.DRAFT],
+                missing=counts[DayState.MISSING],
+                off=counts[DayState.OFF],
+                completion_rate=day_completion_rate(counts[DayState.SUBMITTED], len(working)),
+            )
+        )
+    return points
+
+
+@router.get("/today", response_model=List[TodayState])
+def get_analytics_today(
+    department_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(require_admin_user),
+) -> List[TodayState]:
+    today = date.today()
+
+    if department_id is not None and db.get(DepartmentModel, department_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found")
+
+    users_query = (
+        db.query(UserModel)
+        .options(joinedload(UserModel.department), joinedload(UserModel.job))
+        .filter(UserModel.role == UserRole.EMPLOYEE.value)
+    )
+    if department_id is not None:
+        users_query = users_query.filter(UserModel.department_id == department_id)
+    employees = [
+        user for user in users_query.all() if is_tracked_employee(user) and is_employed_on(user, today)
+    ]
+    if not employees:
+        return []
+
+    entries_by_user = {
+        entry.user_id: entry
+        for entry in db.query(DailyEntryModel)
+        .filter(
+            DailyEntryModel.user_id.in_([employee.id for employee in employees]),
+            DailyEntryModel.date == today,
+        )
+        .all()
+    }
+
+    states: List[TodayState] = []
+    for employee in sorted(employees, key=lambda user: (user.name, user.id)):
+        entry = entries_by_user.get(employee.id)
+        states.append(
+            TodayState(
+                user_id=employee.id,
+                user_name=employee.name,
+                department_id=employee.department_id,
+                department_name=employee.department.name if employee.department else None,
+                job_name=employee.job.name if employee.job else None,
+                state=resolve_day_state(employee, today, entry),
+                entry_id=entry.id if entry else None,
+                submitted_at=entry.submitted_at if entry else None,
+            )
+        )
+    return states

@@ -19,8 +19,11 @@ class DailyEntry(Base):
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
     date = Column(Date, nullable=False, index=True)
     day_type = Column(String, nullable=False, default=DayType.WORK.value)
+    off_reason = Column(String, nullable=True)
+    off_reason_note = Column(String, nullable=True)
     status = Column(String, nullable=False, default=DailyEntryStatus.DRAFT.value)
     submitted_at = Column(DateTime, nullable=True)
+    edited_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

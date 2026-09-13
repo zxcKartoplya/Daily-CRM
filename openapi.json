@@ -1,6 +1,259 @@
 {
   "components": {
     "schemas": {
+      "ActivityChain": {
+        "properties": {
+          "blocked_days": {
+            "title": "Blocked Days",
+            "type": "integer"
+          },
+          "chain_id": {
+            "title": "Chain Id",
+            "type": "string"
+          },
+          "closed_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Date"
+          },
+          "closed_in_period": {
+            "title": "Closed In Period",
+            "type": "boolean"
+          },
+          "days_total": {
+            "title": "Days Total",
+            "type": "integer"
+          },
+          "first_date": {
+            "format": "date",
+            "title": "First Date",
+            "type": "string"
+          },
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ChainPoint"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "last_date": {
+            "format": "date",
+            "title": "Last Date",
+            "type": "string"
+          },
+          "last_status": {
+            "$ref": "#/components/schemas/EntryItemStatus"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ChainOutcome"
+          },
+          "started_in_period": {
+            "title": "Started In Period",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "chain_id",
+          "first_date",
+          "last_date",
+          "last_status",
+          "outcome",
+          "days_total",
+          "blocked_days",
+          "started_in_period",
+          "closed_in_period"
+        ],
+        "title": "ActivityChain",
+        "type": "object"
+      },
+      "ActivityPeriod": {
+        "enum": [
+          "week",
+          "month"
+        ],
+        "title": "ActivityPeriod",
+        "type": "string"
+      },
+      "ActivitySummary": {
+        "properties": {
+          "avg_days_to_done": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Days To Done"
+          },
+          "blocked_chains_count": {
+            "title": "Blocked Chains Count",
+            "type": "integer"
+          },
+          "blocked_days": {
+            "title": "Blocked Days",
+            "type": "integer"
+          },
+          "chains_count": {
+            "title": "Chains Count",
+            "type": "integer"
+          },
+          "done_count": {
+            "title": "Done Count",
+            "type": "integer"
+          },
+          "dropped_count": {
+            "title": "Dropped Count",
+            "type": "integer"
+          },
+          "open_count": {
+            "title": "Open Count",
+            "type": "integer"
+          },
+          "started_count": {
+            "title": "Started Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chains_count",
+          "started_count",
+          "done_count",
+          "dropped_count",
+          "open_count",
+          "blocked_chains_count",
+          "blocked_days"
+        ],
+        "title": "ActivitySummary",
+        "type": "object"
+      },
+      "AdminDailyEntry": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "day_type": {
+            "$ref": "#/components/schemas/DayType"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DailyEntryStatus"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "date",
+          "day_type",
+          "status"
+        ],
+        "title": "AdminDailyEntry",
+        "type": "object"
+      },
       "AnalyticsOverview": {
         "properties": {
           "blocked_items_last_30_days": {
@@ -62,6 +315,240 @@
         "title": "AnalyticsOverview",
         "type": "object"
       },
+      "AnalyticsTimeseriesPoint": {
+        "properties": {
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "draft": {
+            "title": "Draft",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "off": {
+            "title": "Off",
+            "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "working_employees": {
+            "title": "Working Employees",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "working_employees",
+          "submitted",
+          "draft",
+          "missing",
+          "off"
+        ],
+        "title": "AnalyticsTimeseriesPoint",
+        "type": "object"
+      },
+      "Assessment": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "feedback": {
+            "title": "Feedback",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metrics_snapshot": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AssessmentMetric"
+            },
+            "title": "Metrics Snapshot",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "period_from": {
+            "format": "date",
+            "title": "Period From",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "title": "Period To",
+            "type": "string"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "worker_id": {
+            "title": "Worker Id",
+            "type": "integer"
+          },
+          "worker_name": {
+            "title": "Worker Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "worker_id",
+          "worker_name",
+          "created_at",
+          "model",
+          "period_from",
+          "period_to",
+          "feedback"
+        ],
+        "title": "Assessment",
+        "type": "object"
+      },
+      "AssessmentMetric": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "json_name": {
+            "title": "Json Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "json_name",
+          "display_name"
+        ],
+        "title": "AssessmentMetric",
+        "type": "object"
+      },
+      "AssessmentRequest": {
+        "properties": {
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          }
+        },
+        "title": "AssessmentRequest",
+        "type": "object"
+      },
       "BootstrapAdminRequest": {
         "properties": {
           "email": {
@@ -99,6 +586,28 @@
           "day_type": {
             "$ref": "#/components/schemas/DayType",
             "default": "off"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
           }
         },
         "required": [
@@ -210,6 +719,15 @@
         "title": "ChainItem",
         "type": "object"
       },
+      "ChainOutcome": {
+        "enum": [
+          "open",
+          "done",
+          "dropped"
+        ],
+        "title": "ChainOutcome",
+        "type": "string"
+      },
       "ChainPoint": {
         "properties": {
           "date": {
@@ -260,6 +778,27 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
           },
           "status": {
             "$ref": "#/components/schemas/DailyEntryStatus"
@@ -312,10 +851,43 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
           }
         },
         "title": "DailyEntryWrite",
         "type": "object"
+      },
+      "DayState": {
+        "enum": [
+          "submitted",
+          "draft",
+          "missing",
+          "off",
+          "rest"
+        ],
+        "title": "DayState",
+        "type": "string"
       },
       "DayType": {
         "enum": [
@@ -327,9 +899,18 @@
       },
       "DayView": {
         "properties": {
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
           "editable_from": {
             "format": "date",
             "title": "Editable From",
+            "type": "string"
+          },
+          "editable_until": {
+            "format": "date",
+            "title": "Editable Until",
             "type": "string"
           },
           "entry": {
@@ -361,7 +942,9 @@
           }
         },
         "required": [
-          "editable_from"
+          "editable_from",
+          "editable",
+          "editable_until"
         ],
         "title": "DayView",
         "type": "object"
@@ -493,7 +1076,7 @@
           "entry": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DailyEntry"
+                "$ref": "#/components/schemas/AdminDailyEntry"
               },
               {
                 "type": "null"
@@ -522,8 +1105,33 @@
             "title": "Days",
             "type": "array"
           },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
           "schedule_type": {
             "$ref": "#/components/schemas/ScheduleType"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/DepartmentDailyStats"
           },
           "user_id": {
             "title": "User Id",
@@ -551,9 +1159,69 @@
         "required": [
           "user_id",
           "user_name",
-          "schedule_type"
+          "schedule_type",
+          "stats"
         ],
         "title": "DepartmentDailyEmployee",
+        "type": "object"
+      },
+      "DepartmentDailyStats": {
+        "properties": {
+          "blockers": {
+            "title": "Blockers",
+            "type": "integer"
+          },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "done_items": {
+            "title": "Done Items",
+            "type": "integer"
+          },
+          "draft": {
+            "title": "Draft",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "off": {
+            "title": "Off",
+            "type": "integer"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "working_days",
+          "submitted",
+          "draft",
+          "missing",
+          "off",
+          "streak",
+          "blockers",
+          "done_items"
+        ],
+        "title": "DepartmentDailyStats",
         "type": "object"
       },
       "DepartmentUpdate": {
@@ -571,6 +1239,42 @@
           }
         },
         "title": "DepartmentUpdate",
+        "type": "object"
+      },
+      "EmployeeActivity": {
+        "properties": {
+          "chains": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ActivityChain"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "period": {
+            "$ref": "#/components/schemas/ActivityPeriod"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ActivitySummary"
+          }
+        },
+        "required": [
+          "period",
+          "date_from",
+          "date_to",
+          "summary"
+        ],
+        "title": "EmployeeActivity",
         "type": "object"
       },
       "EmployeeProfile": {
@@ -1234,6 +1938,39 @@
         "title": "Metric",
         "type": "object"
       },
+      "OffReason": {
+        "enum": [
+          "vacation",
+          "sick_leave",
+          "unpaid_leave",
+          "business_trip",
+          "other"
+        ],
+        "title": "OffReason",
+        "type": "string"
+      },
+      "OffReasonOption": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/OffReason"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "requires_note": {
+            "title": "Requires Note",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "requires_note"
+        ],
+        "title": "OffReasonOption",
+        "type": "object"
+      },
       "OpenChain": {
         "properties": {
           "chain_id": {
@@ -1488,6 +2225,118 @@
         "title": "ReviewerUpdate",
         "type": "object"
       },
+      "ReviewerUsage": {
+        "properties": {
+          "assessments_count": {
+            "title": "Assessments Count",
+            "type": "integer"
+          },
+          "assessments_last_30_days": {
+            "title": "Assessments Last 30 Days",
+            "type": "integer"
+          },
+          "avg_scores": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewerUsageMetric"
+            },
+            "title": "Avg Scores",
+            "type": "array"
+          },
+          "by_month": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewerUsageMonth"
+            },
+            "title": "By Month",
+            "type": "array"
+          },
+          "employees_covered": {
+            "title": "Employees Covered",
+            "type": "integer"
+          },
+          "jobs_count": {
+            "title": "Jobs Count",
+            "type": "integer"
+          },
+          "last_assessment_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assessment At"
+          },
+          "reviewer_id": {
+            "title": "Reviewer Id",
+            "type": "integer"
+          },
+          "workers_evaluated": {
+            "title": "Workers Evaluated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reviewer_id",
+          "assessments_count",
+          "assessments_last_30_days",
+          "workers_evaluated",
+          "jobs_count",
+          "employees_covered"
+        ],
+        "title": "ReviewerUsage",
+        "type": "object"
+      },
+      "ReviewerUsageMetric": {
+        "properties": {
+          "avg_score": {
+            "title": "Avg Score",
+            "type": "number"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "json_name": {
+            "title": "Json Name",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "json_name",
+          "display_name",
+          "avg_score",
+          "samples"
+        ],
+        "title": "ReviewerUsageMetric",
+        "type": "object"
+      },
+      "ReviewerUsageMonth": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "count"
+        ],
+        "title": "ReviewerUsageMonth",
+        "type": "object"
+      },
       "ReviewerWithJobs": {
         "properties": {
           "description": {
@@ -1695,6 +2544,84 @@
         "title": "TaskUpdate",
         "type": "object"
       },
+      "TodayState": {
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "state": {
+            "$ref": "#/components/schemas/DayState"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_name": {
+            "title": "User Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "user_name",
+          "state"
+        ],
+        "title": "TodayState",
+        "type": "object"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -1829,6 +2756,14 @@
         "title": "User",
         "type": "object"
       },
+      "UserAccessStatus": {
+        "enum": [
+          "active",
+          "inactive"
+        ],
+        "title": "UserAccessStatus",
+        "type": "string"
+      },
       "UserCreate": {
         "properties": {
           "department_id": {
@@ -1895,7 +2830,7 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/UserStatus",
+            "$ref": "#/components/schemas/UserAccessStatus",
             "default": "active"
           },
           "work_days": {
@@ -2149,7 +3084,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserStatus"
+                "$ref": "#/components/schemas/UserAccessStatus"
               },
               {
                 "type": "null"
@@ -2317,9 +3252,130 @@
       },
       "WorkerAIFeedback": {
         "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
           "feedback": {
             "title": "Feedback",
             "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metrics_snapshot": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AssessmentMetric"
+            },
+            "title": "Metrics Snapshot",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "period_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period From"
+          },
+          "period_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period To"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
           },
           "worker_id": {
             "title": "Worker Id",
@@ -2400,7 +3456,7 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/UserStatus",
+            "$ref": "#/components/schemas/UserAccessStatus",
             "default": "active"
           },
           "work_days": {
@@ -2422,6 +3478,84 @@
           "name"
         ],
         "title": "WorkerCreate",
+        "type": "object"
+      },
+      "WorkerDailies": {
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "days": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DepartmentDailyDay"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "schedule_type": {
+            "$ref": "#/components/schemas/ScheduleType"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_name": {
+            "title": "User Name",
+            "type": "string"
+          },
+          "work_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Days"
+          }
+        },
+        "required": [
+          "user_id",
+          "user_name",
+          "schedule_type",
+          "date_from",
+          "date_to"
+        ],
+        "title": "WorkerDailies",
         "type": "object"
       },
       "WorkerDetail": {
@@ -2552,6 +3686,114 @@
         "title": "WorkerDetail",
         "type": "object"
       },
+      "WorkerStatistics": {
+        "properties": {
+          "avg_items_per_day": {
+            "title": "Avg Items Per Day",
+            "type": "number"
+          },
+          "blockers_count": {
+            "title": "Blockers Count",
+            "type": "integer"
+          },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "done_items_count": {
+            "title": "Done Items Count",
+            "type": "integer"
+          },
+          "draft_count": {
+            "title": "Draft Count",
+            "type": "integer"
+          },
+          "dropped_chains_count": {
+            "title": "Dropped Chains Count",
+            "type": "integer"
+          },
+          "last_entry_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Entry At"
+          },
+          "longest_streak": {
+            "title": "Longest Streak",
+            "type": "integer"
+          },
+          "missing_count": {
+            "title": "Missing Count",
+            "type": "integer"
+          },
+          "off_count": {
+            "title": "Off Count",
+            "type": "integer"
+          },
+          "open_chains_count": {
+            "title": "Open Chains Count",
+            "type": "integer"
+          },
+          "period_from": {
+            "format": "date",
+            "title": "Period From",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "title": "Period To",
+            "type": "string"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          },
+          "submitted_count": {
+            "title": "Submitted Count",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "period_from",
+          "period_to",
+          "working_days",
+          "submitted_count",
+          "draft_count",
+          "missing_count",
+          "off_count",
+          "streak",
+          "longest_streak",
+          "open_chains_count",
+          "blockers_count",
+          "dropped_chains_count",
+          "done_items_count",
+          "avg_items_per_day"
+        ],
+        "title": "WorkerStatistics",
+        "type": "object"
+      },
       "WorkerUpdate": {
         "properties": {
           "department_id": {
@@ -2623,7 +3865,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserStatus"
+                "$ref": "#/components/schemas/UserAccessStatus"
               },
               {
                 "type": "null"
@@ -2756,6 +3998,236 @@
         "summary": "Get Admin Analytics Overview",
         "tags": [
           "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/analytics/timeseries": {
+      "get": {
+        "operationId": "get_analytics_timeseries_api_admin_analytics_timeseries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnalyticsTimeseriesPoint"
+                  },
+                  "title": "Response Get Analytics Timeseries Api Admin Analytics Timeseries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analytics Timeseries",
+        "tags": [
+          "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/analytics/today": {
+      "get": {
+        "operationId": "get_analytics_today_api_admin_analytics_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "department_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TodayState"
+                  },
+                  "title": "Response Get Analytics Today Api Admin Analytics Today Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analytics Today",
+        "tags": [
+          "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/assessments/{assessment_id}": {
+      "get": {
+        "operationId": "get_assessment_by_id_api_admin_assessments__assessment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assessment_id",
+            "required": true,
+            "schema": {
+              "title": "Assessment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assessment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Assessment By Id",
+        "tags": [
+          "admin-assessments"
         ]
       }
     },
@@ -3542,7 +5014,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/DailyEntry"
+                    "$ref": "#/components/schemas/AdminDailyEntry"
                   },
                   "title": "Response List Admin Entries Api Admin Reports Get",
                   "type": "array"
@@ -3603,7 +5075,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DailyEntry"
+                  "$ref": "#/components/schemas/AdminDailyEntry"
                 }
               }
             },
@@ -3963,6 +5435,64 @@
           }
         },
         "summary": "Update Reviewer",
+        "tags": [
+          "admin-reviewers"
+        ]
+      }
+    },
+    "/api/admin/reviewers/{reviewer_id}/usage": {
+      "get": {
+        "operationId": "get_reviewer_usage_api_admin_reviewers__reviewer_id__usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reviewer_id",
+            "required": true,
+            "schema": {
+              "title": "Reviewer Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewerUsage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reviewer Usage",
         "tags": [
           "admin-reviewers"
         ]
@@ -5210,6 +6740,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AssessmentRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -5233,6 +6780,275 @@
           }
         },
         "summary": "Get Worker Ai Feedback",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/assessments": {
+      "get": {
+        "operationId": "list_worker_assessments_endpoint_api_admin_workers__worker_id__assessments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Assessment"
+                  },
+                  "title": "Response List Worker Assessments Endpoint Api Admin Workers  Worker Id  Assessments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Worker Assessments Endpoint",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/dailies": {
+      "get": {
+        "operationId": "get_worker_dailies_api_admin_workers__worker_id__dailies_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerDailies"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worker Dailies",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/statistics": {
+      "get": {
+        "operationId": "get_worker_statistics_api_admin_workers__worker_id__statistics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerStatistics"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worker Statistics",
         "tags": [
           "admin-workers"
         ]
@@ -5366,6 +7182,134 @@
         "summary": "Me",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/dictionaries/off-reasons": {
+      "get": {
+        "operationId": "list_off_reasons_api_dictionaries_off_reasons_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OffReasonOption"
+                  },
+                  "title": "Response List Off Reasons Api Dictionaries Off Reasons Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Off Reasons",
+        "tags": [
+          "dictionaries"
+        ]
+      }
+    },
+    "/api/employee/activity": {
+      "get": {
+        "operationId": "get_employee_activity_api_employee_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ActivityPeriod",
+              "default": "week"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeActivity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Employee Activity",
+        "tags": [
+          "employee-activity"
         ]
       }
     },
