@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+import re
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any, List, Sequence
+from typing import Any, List, Mapping, Sequence
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,6 +20,14 @@ from app.services.day_state import is_tracked_employee
 
 DEFAULT_PERIOD_DAYS = 30
 USAGE_WINDOW_DAYS = 30
+SCORE_MIN = 1
+SCORE_MAX = 10
+
+
+@dataclass(frozen=True)
+class ParsedFeedback:
+    feedback: str
+    scores: dict[str, float]
 
 
 def resolve_period(date_from: date | None, date_to: date | None) -> tuple[date, date]:
@@ -32,9 +43,74 @@ def period_bounds(period_from: date, period_to: date) -> tuple[datetime, datetim
     )
 
 
-def metrics_snapshot(reviewer: ReviewerModel | None) -> List[dict[str, Any]]:
+def reviewer_metric_names(reviewer: ReviewerModel | None) -> List[str]:
     if reviewer is None or not reviewer.metrics:
         return []
+    names: List[str] = []
+    for metric in reviewer.metrics:
+        json_name = metric.get("json_name")
+        if json_name and json_name not in names:
+            names.append(json_name)
+    return names
+
+
+def feedback_response_instruction(metric_names: Sequence[str]) -> str:
+    if not metric_names:
+        return "Ответ должен быть на русском языке, 3-5 предложений. Не используй markdown. "
+    return (
+        "Ответ верни строго в JSON без markdown и без пояснений. "
+        "Структура: {\"feedback\": string, \"scores\": {\"<json_name>\": number}}. "
+        "В поле feedback — оценка сотрудника на русском языке, 3-5 предложений, без markdown. "
+        f"В поле scores — балл сотрудника от {SCORE_MIN} до {SCORE_MAX} по каждому критерию оценщика, "
+        f"где {SCORE_MIN} — худший результат, {SCORE_MAX} — лучший. "
+        "Ключ — json_name критерия, значение — число. "
+        "Балл оценивает самого сотрудника по критерию и не связан с приоритетом критерия. "
+        f"Ключи scores: {', '.join(metric_names)}. "
+    )
+
+
+def _strip_code_fence(content: str) -> str:
+    return re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip(), flags=re.IGNORECASE)
+
+
+def _valid_score(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return SCORE_MIN <= value <= SCORE_MAX
+
+
+def parse_feedback_response(content: str, metric_names: Sequence[str]) -> ParsedFeedback:
+    if not metric_names:
+        return ParsedFeedback(feedback=content, scores={})
+
+    cleaned = _strip_code_fence(content)
+    try:
+        data = json.loads(cleaned)
+    except ValueError:
+        return ParsedFeedback(feedback=cleaned, scores={})
+
+    feedback = data.get("feedback") if isinstance(data, dict) else None
+    if not isinstance(feedback, str) or not feedback.strip():
+        return ParsedFeedback(feedback=cleaned, scores={})
+
+    raw_scores = data.get("scores")
+    if not isinstance(raw_scores, dict):
+        raw_scores = {}
+    scores = {
+        name: raw_scores[name]
+        for name in metric_names
+        if name in raw_scores and _valid_score(raw_scores[name])
+    }
+    return ParsedFeedback(feedback=feedback.strip(), scores=scores)
+
+
+def metrics_snapshot(
+    reviewer: ReviewerModel | None,
+    scores: Mapping[str, float] | None = None,
+) -> List[dict[str, Any]]:
+    if reviewer is None or not reviewer.metrics:
+        return []
+    scores = scores or {}
     snapshot = []
     for metric in reviewer.metrics:
         json_name = metric.get("json_name")
@@ -45,7 +121,7 @@ def metrics_snapshot(reviewer: ReviewerModel | None) -> List[dict[str, Any]]:
                 "json_name": json_name,
                 "display_name": metric.get("display_name") or json_name,
                 "weight": metric.get("value"),
-                "score": None,
+                "score": scores.get(json_name),
             }
         )
     return snapshot
@@ -62,6 +138,7 @@ def create_assessment(
     period_from: date,
     period_to: date,
     feedback: str,
+    scores: Mapping[str, float] | None = None,
 ) -> AssessmentModel:
     assessment = AssessmentModel(
         worker_id=worker.id,
@@ -72,7 +149,7 @@ def create_assessment(
         period_from=period_from,
         period_to=period_to,
         feedback_text=feedback,
-        metrics_snapshot=metrics_snapshot(reviewer),
+        metrics_snapshot=metrics_snapshot(reviewer, scores),
     )
     db.add(assessment)
     db.commit()
@@ -194,4 +271,5 @@ def calculate_reviewer_usage(db: Session, reviewer: ReviewerModel) -> ReviewerUs
         employees_covered=employees_covered,
         by_month=_by_month(assessments),
         avg_scores=_avg_scores(assessments),
+        score_max=SCORE_MAX,
     )
