@@ -3019,6 +3019,114 @@
         "title": "WorkerDetail",
         "type": "object"
       },
+      "WorkerStatistics": {
+        "properties": {
+          "avg_items_per_day": {
+            "title": "Avg Items Per Day",
+            "type": "number"
+          },
+          "blockers_count": {
+            "title": "Blockers Count",
+            "type": "integer"
+          },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "done_items_count": {
+            "title": "Done Items Count",
+            "type": "integer"
+          },
+          "draft_count": {
+            "title": "Draft Count",
+            "type": "integer"
+          },
+          "dropped_chains_count": {
+            "title": "Dropped Chains Count",
+            "type": "integer"
+          },
+          "last_entry_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Entry At"
+          },
+          "longest_streak": {
+            "title": "Longest Streak",
+            "type": "integer"
+          },
+          "missing_count": {
+            "title": "Missing Count",
+            "type": "integer"
+          },
+          "off_count": {
+            "title": "Off Count",
+            "type": "integer"
+          },
+          "open_chains_count": {
+            "title": "Open Chains Count",
+            "type": "integer"
+          },
+          "period_from": {
+            "format": "date",
+            "title": "Period From",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "title": "Period To",
+            "type": "string"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          },
+          "submitted_count": {
+            "title": "Submitted Count",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "period_from",
+          "period_to",
+          "working_days",
+          "submitted_count",
+          "draft_count",
+          "missing_count",
+          "off_count",
+          "streak",
+          "longest_streak",
+          "open_chains_count",
+          "blockers_count",
+          "dropped_chains_count",
+          "done_items_count",
+          "avg_items_per_day"
+        ],
+        "title": "WorkerStatistics",
+        "type": "object"
+      },
       "WorkerUpdate": {
         "properties": {
           "department_id": {
@@ -6021,6 +6129,98 @@
           }
         },
         "summary": "List Worker Assessments Endpoint",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/statistics": {
+      "get": {
+        "operationId": "get_worker_statistics_api_admin_workers__worker_id__statistics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerStatistics"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worker Statistics",
         "tags": [
           "admin-workers"
         ]

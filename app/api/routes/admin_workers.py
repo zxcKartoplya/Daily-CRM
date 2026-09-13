@@ -1,9 +1,11 @@
+from datetime import date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
+from app.api.schemas.analytics import WorkerStatistics
 from app.api.schemas.assessment import Assessment, AssessmentRequest
 from app.api.schemas.worker import Worker, WorkerAIFeedback, WorkerCreate, WorkerDetail, WorkerUpdate
 from app.core.security import hash_password
@@ -26,6 +28,7 @@ from app.services.daily_entries import chain_rows, group_by_chain
 from app.services.gigachat import GigaChatClient
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
 from app.services.users import ensure_employee_context, serialize_user_detail
+from app.services.worker_statistics import calculate_worker_statistics, resolve_statistics_period
 
 
 router = APIRouter(dependencies=[Depends(require_admin_user)])
@@ -371,6 +374,32 @@ def list_worker_assessments_endpoint(
     _get_worker_or_404(db, worker_id)
     assessments = list_worker_assessments(db, worker_id, limit=limit, offset=offset)
     return [serialize_assessment(assessment) for assessment in assessments]
+
+
+@router.get("/{worker_id}/statistics", response_model=WorkerStatistics)
+def get_worker_statistics(
+    worker_id: int,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> WorkerStatistics:
+    user = _get_worker_or_404(db, worker_id)
+    period_from, period_to = resolve_statistics_period(date_from, date_to)
+
+    entries = (
+        db.query(DailyEntryModel)
+        .options(joinedload(DailyEntryModel.items))
+        .filter(DailyEntryModel.user_id == user.id)
+        .order_by(DailyEntryModel.date.asc())
+        .all()
+    )
+    return calculate_worker_statistics(
+        user,
+        period_from=period_from,
+        period_to=period_to,
+        entries=entries,
+        chain_rows=chain_rows(db, user.id),
+    )
 
 
 @router.delete("/{worker_id}", status_code=status.HTTP_204_NO_CONTENT)

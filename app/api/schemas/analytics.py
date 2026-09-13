@@ -13,6 +13,26 @@ class EmployeeStatistics(BaseModel):
     last_entry_at: datetime | None = None
 
 
+class WorkerStatistics(BaseModel):
+    user_id: int
+    period_from: date
+    period_to: date
+    working_days: int
+    submitted_count: int
+    draft_count: int
+    missing_count: int
+    off_count: int
+    completion_rate: float | None = None
+    streak: int
+    longest_streak: int
+    open_chains_count: int
+    blockers_count: int
+    dropped_chains_count: int
+    done_items_count: int
+    avg_items_per_day: float
+    last_entry_at: datetime | None = None
+
+
 class DepartmentAnalytics(BaseModel):
     department_id: int
     department_name: str
