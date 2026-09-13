@@ -25,6 +25,22 @@ class WorkerStatistics(BaseModel):
     last_entry_at: datetime | None = None
 
 
+class CompletionTrendPoint(BaseModel):
+    date_from: date
+    date_to: date
+    working_days: int
+    submitted: int
+    completion_rate: float | None = None
+
+
+class WorkerCompletion(BaseModel):
+    user_id: int
+    working_days: int
+    submitted: int
+    completion_rate: float | None = None
+    trend: list[CompletionTrendPoint]
+
+
 class DepartmentAnalytics(BaseModel):
     department_id: int
     department_name: str
@@ -32,6 +48,10 @@ class DepartmentAnalytics(BaseModel):
     entries_count: int
     open_chains_count: int
     blocked_items_count: int
+    working_days: int
+    submitted: int
+    completion_rate: float | None = None
+    trend: list[CompletionTrendPoint]
 
 
 class AnalyticsOverview(BaseModel):

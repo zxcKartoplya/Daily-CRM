@@ -746,6 +746,47 @@
         "title": "ChainPoint",
         "type": "object"
       },
+      "CompletionTrendPoint": {
+        "properties": {
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "working_days",
+          "submitted"
+        ],
+        "title": "CompletionTrendPoint",
+        "type": "object"
+      },
       "DailyEntry": {
         "properties": {
           "date": {
@@ -983,6 +1024,17 @@
             "title": "Blocked Items Count",
             "type": "integer"
           },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
           "department_id": {
             "title": "Department Id",
             "type": "integer"
@@ -1002,6 +1054,21 @@
           "open_chains_count": {
             "title": "Open Chains Count",
             "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionTrendPoint"
+            },
+            "title": "Trend",
+            "type": "array"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
           }
         },
         "required": [
@@ -1010,7 +1077,10 @@
           "employees_count",
           "entries_count",
           "open_chains_count",
-          "blocked_items_count"
+          "blocked_items_count",
+          "working_days",
+          "submitted",
+          "trend"
         ],
         "title": "DepartmentAnalytics",
         "type": "object"
@@ -3338,6 +3408,48 @@
         "title": "WorkerAIFeedback",
         "type": "object"
       },
+      "WorkerCompletion": {
+        "properties": {
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/CompletionTrendPoint"
+            },
+            "title": "Trend",
+            "type": "array"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "working_days": {
+            "title": "Working Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "working_days",
+          "submitted",
+          "trend"
+        ],
+        "title": "WorkerCompletion",
+        "type": "object"
+      },
       "WorkerCreate": {
         "properties": {
           "department_id": {
@@ -3848,6 +3960,40 @@
         "operationId": "get_department_analytics_api_admin_analytics_departments_get",
         "parameters": [
           {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
             "in": "header",
             "name": "Authorization",
             "required": false,
@@ -4112,6 +4258,93 @@
           }
         },
         "summary": "Get Analytics Today",
+        "tags": [
+          "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/analytics/workers": {
+      "get": {
+        "operationId": "get_workers_completion_api_admin_analytics_workers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkerCompletion"
+                  },
+                  "title": "Response Get Workers Completion Api Admin Analytics Workers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Workers Completion",
         "tags": [
           "admin-analytics"
         ]
