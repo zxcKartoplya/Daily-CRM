@@ -62,6 +62,56 @@
         "title": "AnalyticsOverview",
         "type": "object"
       },
+      "AnalyticsTimeseriesPoint": {
+        "properties": {
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "draft": {
+            "title": "Draft",
+            "type": "integer"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "off": {
+            "title": "Off",
+            "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "working_employees": {
+            "title": "Working Employees",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "working_employees",
+          "submitted",
+          "draft",
+          "missing",
+          "off"
+        ],
+        "title": "AnalyticsTimeseriesPoint",
+        "type": "object"
+      },
       "Assessment": {
         "properties": {
           "created_at": {
@@ -3171,6 +3221,109 @@
           }
         },
         "summary": "Get Admin Analytics Overview",
+        "tags": [
+          "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/analytics/timeseries": {
+      "get": {
+        "operationId": "get_analytics_timeseries_api_admin_analytics_timeseries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnalyticsTimeseriesPoint"
+                  },
+                  "title": "Response Get Analytics Timeseries Api Admin Analytics Timeseries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analytics Timeseries",
         "tags": [
           "admin-analytics"
         ]

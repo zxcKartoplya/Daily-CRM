@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -31,3 +31,13 @@ class AnalyticsOverview(BaseModel):
     blocked_items_last_30_days: int
     last_entry_at: datetime | None = None
     completion_rate_last_30_days: float | None = None
+
+
+class AnalyticsTimeseriesPoint(BaseModel):
+    date: date
+    working_employees: int
+    submitted: int
+    draft: int
+    missing: int
+    off: int
+    completion_rate: float | None = None
