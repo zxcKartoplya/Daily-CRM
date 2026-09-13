@@ -353,6 +353,23 @@ def chain_rows(
     return query.order_by(DailyEntryModel.date.asc(), EntryItemModel.position.asc()).all()
 
 
+def chain_rows_by_user(db: Session, user_ids: list[int]) -> dict[int, ChainRows]:
+    result: dict[int, ChainRows] = {user_id: [] for user_id in user_ids}
+    if not user_ids:
+        return result
+
+    rows = (
+        db.query(EntryItemModel, DailyEntryModel.date, DailyEntryModel.user_id)
+        .join(DailyEntryModel, EntryItemModel.entry_id == DailyEntryModel.id)
+        .filter(DailyEntryModel.user_id.in_(user_ids))
+        .order_by(DailyEntryModel.user_id.asc(), DailyEntryModel.date.asc(), EntryItemModel.position.asc())
+        .all()
+    )
+    for item, day, user_id in rows:
+        result[user_id].append((item, day))
+    return result
+
+
 def chain_summaries(db: Session, *, department_id: int | None = None) -> list[tuple[int, int | None, str, str]]:
     """Последний статус каждой линии: (user_id, department_id, chain_id, last_status)."""
     query = db.query(
