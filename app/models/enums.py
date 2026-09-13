@@ -25,6 +25,27 @@ class DayType(str, Enum):
     OFF = "off"
 
 
+class OffReason(str, Enum):
+    VACATION = "vacation"
+    SICK_LEAVE = "sick_leave"
+    UNPAID_LEAVE = "unpaid_leave"
+    BUSINESS_TRIP = "business_trip"
+    OTHER = "other"
+
+
+OFF_REASON_LABELS: dict[OffReason, str] = {
+    OffReason.VACATION: "Отпуск",
+    OffReason.SICK_LEAVE: "Больничный",
+    OffReason.UNPAID_LEAVE: "Отгул за свой счёт",
+    OffReason.BUSINESS_TRIP: "Командировка",
+    OffReason.OTHER: "Другое",
+}
+
+
+def off_reason_requires_note(reason: OffReason) -> bool:
+    return reason is OffReason.OTHER
+
+
 class DailyEntryStatus(str, Enum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
