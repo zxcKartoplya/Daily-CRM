@@ -279,6 +279,7 @@ class TestDepartmentDailiesStats:
         assert busy_stats["draft"] == 1
         assert busy_stats["off"] == 1
         assert busy_stats["streak"] == 2
+        assert busy_stats["completion_rate"] == 0.25
 
         for worker in (busy, other):
             _assert_stats_match(
