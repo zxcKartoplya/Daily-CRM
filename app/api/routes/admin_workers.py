@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.dependencies import require_admin_user
 from app.api.schemas.analytics import WorkerStatistics
 from app.api.schemas.assessment import Assessment, AssessmentRequest
+from app.api.schemas.daily_entry import WorkerDailies
 from app.api.schemas.worker import Worker, WorkerAIFeedback, WorkerCreate, WorkerDetail, WorkerUpdate
 from app.core.security import hash_password
 from app.db.session import get_db
@@ -25,10 +26,11 @@ from app.services.assessments import (
     serialize_assessment,
 )
 from app.services.daily_entries import chain_rows, group_by_chain
+from app.services.dailies_grid import build_daily_days
 from app.services.gigachat import GigaChatClient
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
 from app.services.users import ensure_employee_context, serialize_user_detail
-from app.services.worker_statistics import calculate_worker_statistics, resolve_statistics_period
+from app.services.worker_statistics import calculate_worker_statistics, days_in_range, resolve_statistics_period
 
 
 router = APIRouter(dependencies=[Depends(require_admin_user)])
@@ -399,6 +401,41 @@ def get_worker_statistics(
         period_to=period_to,
         entries=entries,
         chain_rows=chain_rows(db, user.id),
+    )
+
+
+@router.get("/{worker_id}/dailies", response_model=WorkerDailies)
+def get_worker_dailies(
+    worker_id: int,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> WorkerDailies:
+    user = _get_worker_or_404(db, worker_id)
+    period_from, period_to = resolve_statistics_period(date_from, date_to)
+
+    entries = (
+        db.query(DailyEntryModel)
+        .options(joinedload(DailyEntryModel.items))
+        .filter(
+            DailyEntryModel.user_id == user.id,
+            DailyEntryModel.date >= period_from,
+            DailyEntryModel.date <= period_to,
+        )
+        .all()
+    )
+    entries_by_date = {entry.date: entry for entry in entries}
+
+    return WorkerDailies(
+        user_id=user.id,
+        user_name=user.name,
+        job_name=user.job.name if user.job else None,
+        department_name=user.department.name if user.department else None,
+        schedule_type=user.schedule_type,
+        work_days=user.work_days,
+        date_from=period_from,
+        date_to=period_to,
+        days=build_daily_days(user, days_in_range(period_from, period_to), entries_by_date),
     )
 
 

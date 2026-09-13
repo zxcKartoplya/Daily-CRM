@@ -124,3 +124,15 @@ class DepartmentDailies(BaseModel):
     date_from: date
     date_to: date
     employees: list[DepartmentDailyEmployee] = []
+
+
+class WorkerDailies(BaseModel):
+    user_id: int
+    user_name: str
+    job_name: str | None = None
+    department_name: str | None = None
+    schedule_type: ScheduleType
+    work_days: list[int] | None = None
+    date_from: date
+    date_to: date
+    days: list[DepartmentDailyDay] = []

@@ -3096,6 +3096,84 @@
         "title": "WorkerCreate",
         "type": "object"
       },
+      "WorkerDailies": {
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "days": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DepartmentDailyDay"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "schedule_type": {
+            "$ref": "#/components/schemas/ScheduleType"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_name": {
+            "title": "User Name",
+            "type": "string"
+          },
+          "work_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Days"
+          }
+        },
+        "required": [
+          "user_id",
+          "user_name",
+          "schedule_type",
+          "date_from",
+          "date_to"
+        ],
+        "title": "WorkerDailies",
+        "type": "object"
+      },
       "WorkerDetail": {
         "properties": {
           "created_at": {
@@ -6334,6 +6412,98 @@
           }
         },
         "summary": "List Worker Assessments Endpoint",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/dailies": {
+      "get": {
+        "operationId": "get_worker_dailies_api_admin_workers__worker_id__dailies_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerDailies"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Worker Dailies",
         "tags": [
           "admin-workers"
         ]
