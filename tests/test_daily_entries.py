@@ -219,6 +219,22 @@ class TestSaveDay:
         assert body["submitted_at"] is not None
         assert [item["text"] for item in body["items"]] == ["уточнил вчерашнее"]
 
+    def test_submitted_work_day_cannot_be_emptied(self, client, db, employee_headers, employee_user):
+        _seed_entry(
+            db,
+            employee_user,
+            YESTERDAY,
+            items=[(str(uuid4()), "вчерашнее", EntryItemStatus.IN_PROGRESS.value)],
+        )
+        response = client.put(
+            f"/api/employee/daily/{_iso(YESTERDAY)}",
+            headers=employee_headers,
+            json={"items": []},
+        )
+        assert response.status_code == 400
+        items = client.get(f"/api/employee/daily/{_iso(YESTERDAY)}", headers=employee_headers).json()["entry"]["items"]
+        assert [item["text"] for item in items] == ["вчерашнее"]
+
     def test_submitted_day_on_window_edge_is_editable(self, client, db, employee_headers, employee_user):
         edge = TODAY - timedelta(days=backfill_window_days())
         _seed_entry(

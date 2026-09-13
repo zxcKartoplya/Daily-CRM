@@ -165,6 +165,17 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
             detail="У нерабочего дня не может быть пунктов",
         )
 
+    if (
+        entry is not None
+        and entry.status == DailyEntryStatus.SUBMITTED.value
+        and payload.day_type is DayType.WORK
+        and not payload.items
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя оставить отправленный рабочий день без пунктов",
+        )
+
     ordered = _ordered_items(payload.items)
     _validate_items(db, user.id, ordered)
 
