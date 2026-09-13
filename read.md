@@ -47,7 +47,6 @@ tests/
 ├── conftest.py                    # фикстуры: тестовая БД, клиент, пользователи
 ├── test_security.py               # unit-тесты: хэши паролей, JWT-токены
 ├── test_auth.py                   # /api/auth/login, /me, /bootstrap-admin
-├── test_tasks.py                  # /api/admin/tasks — CRUD, проверка ролей
 ├── test_daily_entries.py          # /api/employee/daily — день, линии работ, правила
 ├── test_schedule.py               # график работы: наследование от профессии, валидация
 └── test_department_dailies.py     # /api/admin/departments/{id}/dailies

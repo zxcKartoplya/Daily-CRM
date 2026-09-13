@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-from app.models import Assessment, Department, InternalChatMessage, Job, Reviewer, Statistic, User
+from app.models import Assessment, Department, InternalChatMessage, Job, Reviewer, User
 from app.models.enums import UserRole, UserStatus
 from app.services.assessments import SCORE_MAX, SCORE_MIN, parse_feedback_response
 
@@ -470,7 +470,6 @@ class TestAIFeedbackScores:
         reviewer = _reviewer(db)
         worker = _worker(db, job=_job(db, reviewer))
         _chat_message(db, worker, datetime.utcnow() - timedelta(days=1))
-        db.add(Statistic(user_id=worker.id, date=TODAY, value=98765))
         db.commit()
 
         response = client.post(f"/api/admin/workers/{worker.id}/ai-feedback", headers=admin_headers)
@@ -485,7 +484,6 @@ class TestAIFeedbackScores:
         assert "json_name: quality" in prompt
         assert "Ключи scores: delivery, quality." in prompt
         assert "Числовые показатели" not in prompt
-        assert "98765" not in prompt
 
 
 class TestParseFeedbackResponse:

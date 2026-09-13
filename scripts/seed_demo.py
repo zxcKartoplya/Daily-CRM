@@ -29,8 +29,6 @@ from app.models import (
     InternalChatMessage,
     Job,
     Reviewer,
-    Statistic,
-    Task,
     User,
 )
 from app.models.enums import (
@@ -485,23 +483,6 @@ CHAT_MESSAGES = {
     ],
 }
 
-TASKS = {
-    "Анна Соколова": [
-        (2, "Подготовить демо нового экрана аналитики"),
-        (5, "Составить список компонентов под тёмную тему"),
-    ],
-    "Дмитрий Орлов": [
-        (1, "Описать схему индексов для отчётов"),
-        (4, "Запросить доступы к стенду PgBouncer"),
-    ],
-    "Мария Ильина": [
-        (3, "Обновить регламент эскалации"),
-    ],
-    "Павел Гущин": [
-        (2, "Свести медиаплан на октябрь"),
-    ],
-}
-
 FEEDBACK = {
     "Анна Соколова": [
         "Анна стабильно закрывает задачи по интерфейсу и почти не оставляет хвостов в ревью. "
@@ -570,8 +551,6 @@ def wipe(db: Session) -> None:
     db.query(Assessment).delete(synchronize_session=False)
     db.query(EntryItem).delete(synchronize_session=False)
     db.query(DailyEntry).delete(synchronize_session=False)
-    db.query(Statistic).delete(synchronize_session=False)
-    db.query(Task).delete(synchronize_session=False)
     db.query(InternalChatMessage).delete(synchronize_session=False)
     db.query(EmployeeProfile).delete(synchronize_session=False)
     db.query(EmployeeSettings).delete(synchronize_session=False)
@@ -800,18 +779,9 @@ def fill_items(
 
 
 def create_side_data(db: Session, user: User, user_name: str, today: date, rng: random.Random) -> None:
-    for offset, description in TASKS.get(user_name, []):
-        db.add(Task(user_id=user.id, date=today - timedelta(days=offset), description=description))
-
     for index, message in enumerate(CHAT_MESSAGES.get(user_name, [])):
         created = datetime.combine(today - timedelta(days=index * 3 + 1), time(11, rng.randint(0, 59)))
         db.add(InternalChatMessage(user_id=user.id, message_text=message, created_at=created))
-
-    for offset in range(14):
-        day = today - timedelta(days=offset)
-        if day.isoweekday() > 5:
-            continue
-        db.add(Statistic(user_id=user.id, date=day, value=rng.randint(3, 12)))
 
     db.flush()
 

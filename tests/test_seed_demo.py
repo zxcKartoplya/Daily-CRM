@@ -14,8 +14,6 @@ from app.models import (
     InternalChatMessage,
     Job,
     Reviewer,
-    Statistic,
-    Task,
     User,
 )
 from app.models.enums import DailyEntryStatus, DayType, OffReason, UserRole, UserStatus
@@ -36,8 +34,6 @@ SEEDED_MODELS = [
     InternalChatMessage,
     Job,
     Reviewer,
-    Statistic,
-    Task,
     User,
 ]
 

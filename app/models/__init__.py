@@ -7,6 +7,4 @@ from app.models.employee_settings import EmployeeSettings  # noqa: F401
 from app.models.internal_chat_message import InternalChatMessage  # noqa: F401
 from app.models.job import Job  # noqa: F401
 from app.models.user import User  # noqa: F401
-from app.models.task import Task  # noqa: F401
 from app.models.reviewer import Reviewer  # noqa: F401
-from app.models.statistic import Statistic  # noqa: F401
