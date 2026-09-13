@@ -2,6 +2,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
+from app.models.enums import DayState
+
 
 class EmployeeStatistics(BaseModel):
     user_id: int
@@ -61,3 +63,14 @@ class AnalyticsTimeseriesPoint(BaseModel):
     missing: int
     off: int
     completion_rate: float | None = None
+
+
+class TodayState(BaseModel):
+    user_id: int
+    user_name: str
+    department_id: int | None = None
+    department_name: str | None = None
+    job_name: str | None = None
+    state: DayState
+    entry_id: int | None = None
+    submitted_at: datetime | None = None
