@@ -34,4 +34,10 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
+    assessments = relationship(
+        "Assessment",
+        foreign_keys="Assessment.worker_id",
+        back_populates="worker",
+        cascade="all, delete-orphan",
+    )
     statistics = relationship("Statistic", back_populates="user", cascade="all, delete-orphan")
