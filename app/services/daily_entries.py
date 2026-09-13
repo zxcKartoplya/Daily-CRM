@@ -20,7 +20,14 @@ from app.core.config import get_settings
 from app.models import DailyEntry as DailyEntryModel
 from app.models import EntryItem as EntryItemModel
 from app.models import User as UserModel
-from app.models.enums import OPEN_ITEM_STATUSES, DailyEntryStatus, DayType
+from app.models.enums import (
+    OFF_REASON_LABELS,
+    OPEN_ITEM_STATUSES,
+    DailyEntryStatus,
+    DayType,
+    OffReason,
+    off_reason_requires_note,
+)
 from app.services.schedule import working_days_in_range
 
 ChainRows = list[tuple[EntryItemModel, date]]
@@ -85,6 +92,36 @@ def _ensure_writable(day: date) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Заполнить задним числом можно в пределах {backfill_window_days()} дней",
         )
+
+
+def _off_reason_fields(
+    day_type: DayType,
+    off_reason: OffReason | None,
+    note: str | None,
+) -> tuple[str | None, str | None]:
+    note = (note or "").strip() or None
+    if day_type is DayType.WORK:
+        if off_reason is not None or note is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Причина указывается только для нерабочего дня",
+            )
+        return None, None
+
+    if off_reason is not None and off_reason_requires_note(off_reason):
+        if note is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Для причины «{OFF_REASON_LABELS[off_reason]}» нужен комментарий",
+            )
+        return off_reason.value, note
+
+    if note is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Комментарий указывается только для причины «{OFF_REASON_LABELS[OffReason.OTHER]}»",
+        )
+    return (off_reason.value if off_reason is not None else None), None
 
 
 def _ordered_items(items: list[EntryItemInput]) -> list[tuple[int, EntryItemInput]]:
@@ -159,6 +196,8 @@ def _entry_content(entry: DailyEntryModel) -> tuple:
     items = sorted(entry.items, key=lambda item: (item.position, item.chain_id))
     return (
         entry.day_type,
+        entry.off_reason,
+        entry.off_reason_note,
         tuple((item.chain_id, item.text, item.status, item.link, item.position) for item in items),
     )
 
@@ -195,6 +234,7 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
             detail="Нельзя оставить отправленный рабочий день без пунктов",
         )
 
+    off_reason, off_reason_note = _off_reason_fields(payload.day_type, payload.off_reason, payload.off_reason_note)
     ordered = _ordered_items(payload.items)
     _validate_items(db, user.id, ordered)
     content_before = _submitted_content(entry)
@@ -212,6 +252,8 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
     else:
         entry.day_type = payload.day_type.value
 
+    entry.off_reason = off_reason
+    entry.off_reason_note = off_reason_note
     _replace_items(db, entry, ordered)
     _mark_edited(entry, content_before)
     db.flush()
@@ -251,6 +293,8 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
     if not days:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список дат пуст")
 
+    off_reason, off_reason_note = _off_reason_fields(payload.day_type, payload.off_reason, payload.off_reason_note)
+
     existing = {
         entry.date: entry
         for entry in db.query(DailyEntryModel)
@@ -278,6 +322,8 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
             _replace_items(db, entry, [])
 
         entry.day_type = DayType.OFF.value
+        entry.off_reason = off_reason
+        entry.off_reason_note = off_reason_note
         _mark_edited(entry, content_before)
         if content_before is None:
             entry.submitted_at = datetime.utcnow()

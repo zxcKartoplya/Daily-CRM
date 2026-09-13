@@ -8,6 +8,7 @@ from app.api.routes import (
     admin_users,
     admin_workers,
     auth,
+    dictionaries,
     employee_daily,
     employee_profile,
     employee_settings,
@@ -23,6 +24,7 @@ from app.api.routes import (
 router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["auth"], include_in_schema=True)
+router.include_router(dictionaries.router, prefix="/dictionaries", tags=["dictionaries"], include_in_schema=True)
 router.include_router(employee_profile.router, prefix="/employee/profile", tags=["employee-profile"], include_in_schema=True)
 router.include_router(employee_settings.router, prefix="/employee/settings", tags=["employee-settings"], include_in_schema=True)
 router.include_router(

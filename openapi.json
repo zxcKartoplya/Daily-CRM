@@ -46,6 +46,27 @@
             "title": "Items",
             "type": "array"
           },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
+          },
           "status": {
             "$ref": "#/components/schemas/DailyEntryStatus"
           },
@@ -408,6 +429,28 @@
           "day_type": {
             "$ref": "#/components/schemas/DayType",
             "default": "off"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
           }
         },
         "required": [
@@ -570,6 +613,27 @@
             "title": "Items",
             "type": "array"
           },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
+          },
           "status": {
             "$ref": "#/components/schemas/DailyEntryStatus"
           },
@@ -621,6 +685,28 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "off_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "off_reason_note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off Reason Note"
           }
         },
         "title": "DailyEntryWrite",
@@ -1552,6 +1638,39 @@
           "description"
         ],
         "title": "Metric",
+        "type": "object"
+      },
+      "OffReason": {
+        "enum": [
+          "vacation",
+          "sick_leave",
+          "unpaid_leave",
+          "business_trip",
+          "other"
+        ],
+        "title": "OffReason",
+        "type": "string"
+      },
+      "OffReasonOption": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/OffReason"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "requires_note": {
+            "title": "Requires Note",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "requires_note"
+        ],
+        "title": "OffReasonOption",
         "type": "object"
       },
       "OpenChain": {
@@ -6440,6 +6559,59 @@
         "summary": "Me",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/dictionaries/off-reasons": {
+      "get": {
+        "operationId": "list_off_reasons_api_dictionaries_off_reasons_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OffReasonOption"
+                  },
+                  "title": "Response List Off Reasons Api Dictionaries Off Reasons Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Off Reasons",
+        "tags": [
+          "dictionaries"
         ]
       }
     },

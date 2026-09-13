@@ -1,9 +1,11 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus, ScheduleType
+from app.models.enums import DailyEntryStatus, DayType, EntryItemStatus, OffReason, ScheduleType
+
+OFF_REASON_NOTE_MAX_LENGTH = 200
 
 
 class EntryItemInput(BaseModel):
@@ -27,12 +29,16 @@ class EntryItem(BaseModel):
 
 class DailyEntryWrite(BaseModel):
     day_type: DayType = DayType.WORK
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = Field(default=None, max_length=OFF_REASON_NOTE_MAX_LENGTH)
     items: list[EntryItemInput] = []
 
 
 class BulkDayTypeWrite(BaseModel):
     dates: list[date]
     day_type: DayType = DayType.OFF
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = Field(default=None, max_length=OFF_REASON_NOTE_MAX_LENGTH)
 
 
 class DailyEntry(BaseModel):
@@ -41,6 +47,8 @@ class DailyEntry(BaseModel):
     department_id: int | None = None
     date: date
     day_type: DayType
+    off_reason: OffReason | None = None
+    off_reason_note: str | None = None
     status: DailyEntryStatus
     submitted_at: datetime | None = None
     items: list[EntryItem] = []
