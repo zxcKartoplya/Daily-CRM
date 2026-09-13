@@ -62,6 +62,190 @@
         "title": "AnalyticsOverview",
         "type": "object"
       },
+      "Assessment": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "feedback": {
+            "title": "Feedback",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metrics_snapshot": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AssessmentMetric"
+            },
+            "title": "Metrics Snapshot",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "period_from": {
+            "format": "date",
+            "title": "Period From",
+            "type": "string"
+          },
+          "period_to": {
+            "format": "date",
+            "title": "Period To",
+            "type": "string"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
+          },
+          "worker_id": {
+            "title": "Worker Id",
+            "type": "integer"
+          },
+          "worker_name": {
+            "title": "Worker Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "worker_id",
+          "worker_name",
+          "created_at",
+          "model",
+          "period_from",
+          "period_to",
+          "feedback"
+        ],
+        "title": "Assessment",
+        "type": "object"
+      },
+      "AssessmentMetric": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "json_name": {
+            "title": "Json Name",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "json_name",
+          "display_name"
+        ],
+        "title": "AssessmentMetric",
+        "type": "object"
+      },
+      "AssessmentRequest": {
+        "properties": {
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To"
+          }
+        },
+        "title": "AssessmentRequest",
+        "type": "object"
+      },
       "BootstrapAdminRequest": {
         "properties": {
           "email": {
@@ -1488,6 +1672,118 @@
         "title": "ReviewerUpdate",
         "type": "object"
       },
+      "ReviewerUsage": {
+        "properties": {
+          "assessments_count": {
+            "title": "Assessments Count",
+            "type": "integer"
+          },
+          "assessments_last_30_days": {
+            "title": "Assessments Last 30 Days",
+            "type": "integer"
+          },
+          "avg_scores": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewerUsageMetric"
+            },
+            "title": "Avg Scores",
+            "type": "array"
+          },
+          "by_month": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReviewerUsageMonth"
+            },
+            "title": "By Month",
+            "type": "array"
+          },
+          "employees_covered": {
+            "title": "Employees Covered",
+            "type": "integer"
+          },
+          "jobs_count": {
+            "title": "Jobs Count",
+            "type": "integer"
+          },
+          "last_assessment_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Assessment At"
+          },
+          "reviewer_id": {
+            "title": "Reviewer Id",
+            "type": "integer"
+          },
+          "workers_evaluated": {
+            "title": "Workers Evaluated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reviewer_id",
+          "assessments_count",
+          "assessments_last_30_days",
+          "workers_evaluated",
+          "jobs_count",
+          "employees_covered"
+        ],
+        "title": "ReviewerUsage",
+        "type": "object"
+      },
+      "ReviewerUsageMetric": {
+        "properties": {
+          "avg_score": {
+            "title": "Avg Score",
+            "type": "number"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "json_name": {
+            "title": "Json Name",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "json_name",
+          "display_name",
+          "avg_score",
+          "samples"
+        ],
+        "title": "ReviewerUsageMetric",
+        "type": "object"
+      },
+      "ReviewerUsageMonth": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "count"
+        ],
+        "title": "ReviewerUsageMonth",
+        "type": "object"
+      },
       "ReviewerWithJobs": {
         "properties": {
           "description": {
@@ -2317,9 +2613,130 @@
       },
       "WorkerAIFeedback": {
         "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
           "feedback": {
             "title": "Feedback",
             "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metrics_snapshot": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AssessmentMetric"
+            },
+            "title": "Metrics Snapshot",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "period_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period From"
+          },
+          "period_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period To"
+          },
+          "reviewer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
+          },
+          "reviewer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Name"
           },
           "worker_id": {
             "title": "Worker Id",
@@ -2756,6 +3173,64 @@
         "summary": "Get Admin Analytics Overview",
         "tags": [
           "admin-analytics"
+        ]
+      }
+    },
+    "/api/admin/assessments/{assessment_id}": {
+      "get": {
+        "operationId": "get_assessment_by_id_api_admin_assessments__assessment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assessment_id",
+            "required": true,
+            "schema": {
+              "title": "Assessment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assessment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Assessment By Id",
+        "tags": [
+          "admin-assessments"
         ]
       }
     },
@@ -3963,6 +4438,64 @@
           }
         },
         "summary": "Update Reviewer",
+        "tags": [
+          "admin-reviewers"
+        ]
+      }
+    },
+    "/api/admin/reviewers/{reviewer_id}/usage": {
+      "get": {
+        "operationId": "get_reviewer_usage_api_admin_reviewers__reviewer_id__usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reviewer_id",
+            "required": true,
+            "schema": {
+              "title": "Reviewer Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewerUsage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reviewer Usage",
         "tags": [
           "admin-reviewers"
         ]
@@ -5210,6 +5743,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AssessmentRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -5233,6 +5783,91 @@
           }
         },
         "summary": "Get Worker Ai Feedback",
+        "tags": [
+          "admin-workers"
+        ]
+      }
+    },
+    "/api/admin/workers/{worker_id}/assessments": {
+      "get": {
+        "operationId": "list_worker_assessments_endpoint_api_admin_workers__worker_id__assessments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worker_id",
+            "required": true,
+            "schema": {
+              "title": "Worker Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Assessment"
+                  },
+                  "title": "Response List Worker Assessments Endpoint Api Admin Workers  Worker Id  Assessments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Worker Assessments Endpoint",
         "tags": [
           "admin-workers"
         ]

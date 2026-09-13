@@ -1,10 +1,10 @@
-from datetime import date, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
+from app.api.schemas.assessment import Assessment, AssessmentRequest
 from app.api.schemas.worker import Worker, WorkerAIFeedback, WorkerCreate, WorkerDetail, WorkerUpdate
 from app.core.security import hash_password
 from app.db.session import get_db
@@ -15,6 +15,13 @@ from app.models import Job as JobModel
 from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
 from app.models.enums import CLOSED_ITEM_STATUSES, EntryItemStatus, UserRole
+from app.services.assessments import (
+    create_assessment,
+    list_worker_assessments,
+    period_bounds,
+    resolve_period,
+    serialize_assessment,
+)
 from app.services.daily_entries import chain_rows, group_by_chain
 from app.services.gigachat import GigaChatClient
 from app.services.schedule import apply_schedule_update, schedule_for_new_user
@@ -208,7 +215,9 @@ def update_worker(
 @router.post("/{worker_id}/ai-feedback", response_model=WorkerAIFeedback)
 def get_worker_ai_feedback(
     worker_id: int,
+    payload: AssessmentRequest | None = None,
     db: Session = Depends(get_db),
+    current_admin: UserModel = Depends(require_admin_user),
 ) -> WorkerAIFeedback:
     user = (
         db.query(UserModel)
@@ -222,13 +231,19 @@ def get_worker_ai_feedback(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found")
 
-    since = date.today() - timedelta(days=29)
+    period_from, period_to = resolve_period(
+        payload.date_from if payload else None,
+        payload.date_to if payload else None,
+    )
+    since, until = period_bounds(period_from, period_to)
+    period_label = f"{period_from.strftime('%d.%m.%Y')} — {period_to.strftime('%d.%m.%Y')}"
 
     chat_messages = (
         db.query(InternalChatMessageModel)
         .filter(
             InternalChatMessageModel.user_id == worker_id,
             InternalChatMessageModel.created_at >= since,
+            InternalChatMessageModel.created_at < until,
         )
         .order_by(InternalChatMessageModel.created_at.asc())
         .limit(30)
@@ -239,8 +254,10 @@ def get_worker_ai_feedback(
         return WorkerAIFeedback(
             worker_id=worker_id,
             worker_name=user.name,
+            period_from=period_from,
+            period_to=period_to,
             feedback=(
-                f"У сотрудника «{user.name}» нет дейликов за последние 30 дней. "
+                f"У сотрудника «{user.name}» нет дейликов за период {period_label}. "
                 f"Оценка невозможна — недостаточно данных для анализа."
             ),
         )
@@ -252,13 +269,21 @@ def get_worker_ai_feedback(
 
     entries_count = (
         db.query(DailyEntryModel)
-        .filter(DailyEntryModel.user_id == worker_id, DailyEntryModel.date >= since)
+        .filter(
+            DailyEntryModel.user_id == worker_id,
+            DailyEntryModel.date >= period_from,
+            DailyEntryModel.date <= period_to,
+        )
         .count()
     )
     chains = group_by_chain(chain_rows(db, worker_id))
     statistics = (
         db.query(StatisticModel)
-        .filter(StatisticModel.user_id == worker_id, StatisticModel.date >= since)
+        .filter(
+            StatisticModel.user_id == worker_id,
+            StatisticModel.date >= period_from,
+            StatisticModel.date <= period_to,
+        )
         .order_by(StatisticModel.date.desc())
         .all()
     )
@@ -289,12 +314,12 @@ def get_worker_ai_feedback(
             1
             for rows in chains.values()
             for item, day in rows
-            if item.status == EntryItemStatus.BLOCKED.value and day >= since
+            if item.status == EntryItemStatus.BLOCKED.value and period_from <= day <= period_to
         )
         reports_supplement = (
-            f"\nДополнительно — дейлики в системе ({entries_count} записей за 30 дней):\n"
+            f"\nДополнительно — дейлики в системе ({entries_count} записей за период {period_label}):\n"
             f"Открытых линий работы: {open_chains_count}\n"
-            f"Пунктов в блокере за 30 дней: {blocked_items_count}\n"
+            f"Пунктов в блокере за период: {blocked_items_count}\n"
             f"Брошенных линий: {dropped_chains_count}\n"
         )
 
@@ -309,7 +334,7 @@ def get_worker_ai_feedback(
         f"{metrics_text}"
         f"{stats_text}"
         f"{reports_supplement}\n"
-        f"Дейлики из чата за последние 30 дней ({len(chat_messages)} сообщений):\n{chat_text}"
+        f"Дейлики из чата за период {period_label} ({len(chat_messages)} сообщений):\n{chat_text}"
     )
 
     try:
@@ -322,7 +347,30 @@ def get_worker_ai_feedback(
             detail=f"GigaChat unavailable: {exc}",
         ) from exc
 
-    return WorkerAIFeedback(worker_id=worker_id, worker_name=user.name, feedback=feedback)
+    assessment = create_assessment(
+        db,
+        worker=user,
+        job=user.job,
+        reviewer=reviewer,
+        created_by=current_admin.id,
+        model=response.get("model") or client.model or "gigachat",
+        period_from=period_from,
+        period_to=period_to,
+        feedback=feedback,
+    )
+    return WorkerAIFeedback(**serialize_assessment(assessment).model_dump())
+
+
+@router.get("/{worker_id}/assessments", response_model=List[Assessment])
+def list_worker_assessments_endpoint(
+    worker_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> List[Assessment]:
+    _get_worker_or_404(db, worker_id)
+    assessments = list_worker_assessments(db, worker_id, limit=limit, offset=offset)
+    return [serialize_assessment(assessment) for assessment in assessments]
 
 
 @router.delete("/{worker_id}", status_code=status.HTTP_204_NO_CONTENT)

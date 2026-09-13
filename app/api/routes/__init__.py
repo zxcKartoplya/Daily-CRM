@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     admin_analytics,
+    admin_assessments,
     admin_departments,
     admin_reports,
     admin_users,
@@ -74,6 +75,12 @@ router.include_router(
     admin_workers.router,
     prefix="/admin/workers",
     tags=["admin-workers"],
+    include_in_schema=True,
+)
+router.include_router(
+    admin_assessments.router,
+    prefix="/admin/assessments",
+    tags=["admin-assessments"],
     include_in_schema=True,
 )
 router.include_router(tasks.router, prefix="/admin/tasks", tags=["admin-tasks"], include_in_schema=True)
