@@ -1,7 +1,14 @@
-"""Пересобирает демонстрационные данные: справочники, работников, дейлики за 30 дней."""
+"""Пересобирает демонстрационные данные.
+
+Справочники; работники, чей статус выводится из признака доступа и факта входа
+(active, invited и inactive с сохранённой старой историей); дейлики за 30 дней
+с причинами нерабочих дней и отметками правки после отправки; история AI-оценок
+за последние три месяца; побочные задачи, сообщения чата и статистика.
+"""
 
 import random
 import sys
+from collections import Counter
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -13,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models import (
+    Assessment,
     DailyEntry,
     Department,
     EmployeeProfile,
@@ -29,14 +37,29 @@ from app.models.enums import (
     DailyEntryStatus,
     DayType,
     EntryItemStatus,
+    OffReason,
     ScheduleType,
     UserRole,
     UserStatus,
 )
+from app.services.assessments import metrics_snapshot
+from app.services.users import access_status
 
 WINDOW_DAYS = 30
 DEMO_PASSWORD = "Demo12345"
 SEED = 20260913
+RECENT_ASSESSMENT_OFFSETS = (2, 9)
+OLDEST_ASSESSMENT_OFFSETS = (70, 88)
+ASSESSMENT_GAP_DAYS = 10
+EMPLOYMENT_LEAD_DAYS = 7
+INVITED_LEAD_DAYS = 3
+EMPLOYMENT_TIME = time(9, 0)
+LAST_LOGIN_TIME = time(21, 30)
+EDIT_WINDOW_DAYS = 7
+ASSESSMENT_MODEL = "GigaChat"
+ASSESSMENT_PERIOD_DAYS = 30
+MIN_EXTRA_ASSESSMENTS = 0
+MAX_EXTRA_ASSESSMENTS = 2
 
 IN_PROGRESS = EntryItemStatus.IN_PROGRESS.value
 BLOCKED = EntryItemStatus.BLOCKED.value
@@ -168,7 +191,6 @@ WORKERS = [
         "name": "Анна Соколова",
         "email": "anna.sokolova@example.com",
         "job": "Фронтенд-разработчик",
-        "status": UserStatus.ACTIVE.value,
         "profile": {"timezone": "Europe/Moscow", "preferred_language": "ru"},
         "settings": {
             "notification_time": time(18, 30),
@@ -179,12 +201,14 @@ WORKERS = [
         "off_days": [],
         "writes_today": True,
         "today_status": DailyEntryStatus.SUBMITTED.value,
+        "access_open": True,
+        "last_login_offset_days": 1,
+        "edited_after_submit": True,
     },
     {
         "name": "Дмитрий Орлов",
         "email": "dmitry.orlov@example.com",
         "job": "Бэкенд-разработчик",
-        "status": UserStatus.ACTIVE.value,
         "profile": {"timezone": "Europe/Samara", "preferred_language": "ru"},
         "settings": {
             "notification_time": time(19, 0),
@@ -192,15 +216,17 @@ WORKERS = [
             "preferred_daily_format": "text",
         },
         "skip_days": [4, 11],
-        "off_days": [7, 8],
+        "off_days": [([7, 8, 9], OffReason.OTHER, "Переезд")],
         "writes_today": True,
         "today_status": DailyEntryStatus.DRAFT.value,
+        "access_open": True,
+        "last_login_offset_days": 1,
+        "edited_after_submit": True,
     },
     {
         "name": "Мария Ильина",
         "email": "maria.ilina@example.com",
         "job": "Специалист поддержки",
-        "status": UserStatus.ACTIVE.value,
         "profile": {"timezone": "Asia/Yekaterinburg", "preferred_language": "ru"},
         "settings": {
             "notification_time": time(17, 0),
@@ -208,15 +234,17 @@ WORKERS = [
             "preferred_daily_format": "list",
         },
         "skip_days": [9],
-        "off_days": [],
+        "off_days": [([16, 17, 18], OffReason.SICK_LEAVE, None)],
         "writes_today": False,
         "today_status": DailyEntryStatus.SUBMITTED.value,
+        "access_open": True,
+        "last_login_offset_days": 2,
+        "edited_after_submit": True,
     },
     {
         "name": "Павел Гущин",
         "email": "pavel.gushchin@example.com",
         "job": "Маркетолог",
-        "status": UserStatus.ACTIVE.value,
         "profile": {"timezone": "Europe/Moscow", "preferred_language": "ru"},
         "settings": {
             "notification_time": None,
@@ -224,15 +252,17 @@ WORKERS = [
             "preferred_daily_format": "text",
         },
         "skip_days": [2, 6, 13],
-        "off_days": [],
+        "off_days": [([20, 21, 22], OffReason.BUSINESS_TRIP, None)],
         "writes_today": True,
         "today_status": DailyEntryStatus.SUBMITTED.value,
+        "access_open": True,
+        "last_login_offset_days": 1,
+        "edited_after_submit": False,
     },
     {
         "name": "Ольга Титова",
         "email": "olga.titova@example.com",
         "job": "Контент-менеджер",
-        "status": UserStatus.INVITED.value,
         "profile": {"timezone": "Europe/Moscow", "preferred_language": "ru"},
         "settings": {
             "notification_time": time(18, 0),
@@ -243,6 +273,27 @@ WORKERS = [
         "off_days": [],
         "writes_today": False,
         "today_status": DailyEntryStatus.SUBMITTED.value,
+        "access_open": True,
+        "last_login_offset_days": None,
+        "edited_after_submit": False,
+    },
+    {
+        "name": "Игорь Мельников",
+        "email": "igor.melnikov@example.com",
+        "job": "Бэкенд-разработчик",
+        "profile": {"timezone": "Europe/Moscow", "preferred_language": "ru"},
+        "settings": {
+            "notification_time": time(18, 0),
+            "reminder_enabled": True,
+            "preferred_daily_format": "list",
+        },
+        "skip_days": [],
+        "off_days": [([25, 26, 27], OffReason.VACATION, None)],
+        "writes_today": False,
+        "today_status": DailyEntryStatus.SUBMITTED.value,
+        "access_open": False,
+        "last_login_offset_days": 20,
+        "edited_after_submit": False,
     },
 ]
 
@@ -330,6 +381,23 @@ CHAINS = {
             "steps": [IN_PROGRESS, BLOCKED],
         },
     ],
+    "Игорь Мельников": [
+        {
+            "text": "Перевод сервиса уведомлений на очередь",
+            "link": "https://git.example.com/api/pull/260",
+            "steps": [IN_PROGRESS, IN_PROGRESS, DONE],
+        },
+        {
+            "text": "Ретраи вебхуков платёжного шлюза",
+            "link": "https://git.example.com/api/pull/266",
+            "steps": [IN_PROGRESS, BLOCKED, DONE],
+        },
+        {
+            "text": "Дедупликация событий биллинга",
+            "link": None,
+            "steps": [IN_PROGRESS, DONE],
+        },
+    ],
 }
 
 ONE_DAY_ITEMS = {
@@ -381,6 +449,16 @@ ONE_DAY_ITEMS = {
         "Планёрка с отделом продаж",
         "Разобрал заявки с прошлой кампании",
     ],
+    "Игорь Мельников": [
+        "Ревью миграций по биллингу",
+        "Разбор алертов по очереди уведомлений",
+        "Передача дел по сервису уведомлений",
+        "Дописал тесты на обработку вебхуков",
+        "Обновил описание API для партнёров",
+        "Разобрал падение интеграционных тестов",
+        "Поправил таймауты клиента шлюза",
+        "Дневной созвон команды",
+    ],
 }
 
 MIN_ITEMS_PER_DAY = 2
@@ -424,8 +502,72 @@ TASKS = {
     ],
 }
 
+FEEDBACK = {
+    "Анна Соколова": [
+        "Анна стабильно закрывает задачи по интерфейсу и почти не оставляет хвостов в ревью. "
+        "Блокер с формой логина сняла сама, договорившись с дизайнером. "
+        "Крупные экраны стоит дробить заранее, чтобы аналитика не растягивалась на неделю.",
+        "За период выросла доля завершённых линий, дейлики подробные и со ссылками на PR. "
+        "Отказ от тёмной темы оформлен вовремя, без затягивания.",
+        "Качество кода высокое: снапшот-тесты и доступность поддерживаются без напоминаний. "
+        "Сроки по виртуальному скроллу выдержаны. "
+        "Можно активнее подключаться к ревью смежных команд.",
+        "Начало периода ушло на разбор долгов в зависимостях, поэтому новых фич немного. "
+        "Отчётность при этом регулярная и прозрачная.",
+    ],
+    "Дмитрий Орлов": [
+        "Дмитрий держит на себе инфраструктурные задачи, но две линии подряд застревали в блокерах больше трёх дней. "
+        "Эскалацию по доступам к стенду стоит делать в тот же день.",
+        "Выгрузка OpenAPI в CI доведена до конца и снизила число расхождений контракта. "
+        "Пропуски дейликов единичные, но черновики иногда остаются неотправленными. "
+        "Рекомендуется закрывать день до вечернего напоминания.",
+        "Хорошая глубина разбора инцидентов: причина таймаутов найдена и закрыта индексом. "
+        "Оценка сроков по истории линий оказалась занижена вдвое.",
+        "Задачи по API сданы, тесты на границы редактирования дописаны. "
+        "Отказ от материализованных представлений аргументирован. "
+        "Стоит чаще делиться планами в общем канале.",
+    ],
+    "Мария Ильина": [
+        "Мария быстро разбирает ночную очередь, первые ответы клиентам укладываются в норматив. "
+        "Повторных обращений по оплатам за период не было.",
+        "Доля решённых обращений выросла благодаря обновлённым шаблонам ответов. "
+        "Спорные тикеты разбираются с руководителем, а не копятся. "
+        "Повторяющиеся жалобы стоит собирать в отдельную заметку.",
+        "Клиенты высоко оценивают общение, особенно по сложным возвратам. "
+        "Инструкция по восстановлению доступа сократила однотипные вопросы.",
+        "Смены закрываются полностью, но в дни с большой очередью дейлики становятся слишком краткими. "
+        "Скорость ответа при этом не проседает. "
+        "Стоит отмечать в отчёте, какие обращения переданы дальше.",
+    ],
+    "Павел Гущин": [
+        "Павел запустил осеннюю кампанию в срок, первые показатели конверсии выше прошлого квартала. "
+        "Согласование бюджета на Q4 остаётся главным риском, его стоит поднять выше.",
+        "A/B тест лендинга доведён до результата, выводы оформлены понятно. "
+        "Расход рекламного бюджета в пределах плана. "
+        "Дейлики заполняются нерегулярно, из-за этого сложно отследить ход работ.",
+        "Креативы проходят проверку до запуска, правок от бренда стало меньше. "
+        "Работа с подрядчиком по видео идёт без срывов.",
+        "За период много операционных задач и мало завершённых инициатив. "
+        "Дашборд по конверсии обновлён и используется продажами. "
+        "Стоит выделять время под одну крупную задачу в неделю.",
+    ],
+    "Игорь Мельников": [
+        "Игорь закрыл перевод сервиса уведомлений на очередь перед передачей дел. "
+        "Незавершённые задачи переданы команде с описанием.",
+        "Качество кода стабильное, но интеграция с платёжным шлюзом сдвинулась на неделю. "
+        "Блокеры эскалировались своевременно. "
+        "Внешние зависимости стоит оценивать точнее.",
+        "Ретраи вебхуков и дедупликация событий доведены до прода. "
+        "Дейлики подробные, линии работ легко проследить.",
+        "Много времени ушло на поддержку старого API, поэтому новые задачи стартовали позже. "
+        "Инцидентов по его зонам ответственности не было. "
+        "Дежурства имеет смысл планировать заранее.",
+    ],
+}
+
 
 def wipe(db: Session) -> None:
+    db.query(Assessment).delete(synchronize_session=False)
     db.query(EntryItem).delete(synchronize_session=False)
     db.query(DailyEntry).delete(synchronize_session=False)
     db.query(Statistic).delete(synchronize_session=False)
@@ -475,11 +617,16 @@ def create_catalog(db: Session) -> tuple[dict[str, Department], dict[str, Job]]:
     return departments, jobs
 
 
-def create_workers(db: Session, jobs: dict[str, Job]) -> dict[str, User]:
+def create_workers(db: Session, jobs: dict[str, Job], today: date) -> dict[str, User]:
     password_hash = hash_password(DEMO_PASSWORD)
+    employed_since = datetime.combine(
+        today - timedelta(days=max(WINDOW_DAYS - 1, OLDEST_ASSESSMENT_OFFSETS[1]) + EMPLOYMENT_LEAD_DAYS),
+        EMPLOYMENT_TIME,
+    )
     workers = {}
     for payload in WORKERS:
         job = jobs[payload["job"]]
+        login_offset = payload["last_login_offset_days"]
         user = User(
             name=payload["name"],
             email=payload["email"],
@@ -487,10 +634,21 @@ def create_workers(db: Session, jobs: dict[str, Job]) -> dict[str, User]:
             role=UserRole.EMPLOYEE.value,
             department_id=job.department_id,
             job_id=job.id,
-            status=payload["status"],
+            last_login_at=(
+                datetime.combine(today - timedelta(days=login_offset), LAST_LOGIN_TIME)
+                if login_offset is not None
+                else None
+            ),
             schedule_type=job.schedule_type,
             work_days=list(job.work_days) if job.work_days else None,
         )
+        user.status = access_status(user, access_open=payload["access_open"]).value
+        user.created_at = (
+            employed_since
+            if login_offset is not None
+            else datetime.combine(today - timedelta(days=INVITED_LEAD_DAYS), EMPLOYMENT_TIME)
+        )
+        user.updated_at = user.last_login_at or user.created_at
         db.add(user)
         db.flush()
 
@@ -541,17 +699,24 @@ def create_entries(
     today: date,
     rng: random.Random,
 ) -> dict[date, DailyEntry]:
-    off_days = {today - timedelta(days=offset) for offset in payload["off_days"]}
+    off_reasons = {
+        today - timedelta(days=offset): (reason, note)
+        for offsets, reason, note in payload["off_days"]
+        for offset in offsets
+    }
     entries = {}
 
     for day in days:
-        is_off = day in off_days
+        is_off = day in off_reasons
+        reason, note = off_reasons.get(day, (None, None))
         status = payload["today_status"] if day == today else DailyEntryStatus.SUBMITTED.value
         entry = DailyEntry(
             user_id=user.id,
             department_id=user.department_id,
             date=day,
             day_type=DayType.OFF.value if is_off else DayType.WORK.value,
+            off_reason=reason.value if reason is not None else None,
+            off_reason_note=note,
             status=status,
             submitted_at=(
                 datetime.combine(day, time(rng.randint(17, 20), rng.randint(0, 59)))
@@ -651,34 +816,139 @@ def create_side_data(db: Session, user: User, user_name: str, today: date, rng: 
     db.flush()
 
 
-def main() -> None:
+def has_history(payload: dict) -> bool:
+    return payload["last_login_offset_days"] is not None
+
+
+def history_end(payload: dict, today: date) -> date:
+    if payload["access_open"]:
+        return today
+    return today - timedelta(days=payload["last_login_offset_days"])
+
+
+def mark_edited(db: Session, entries: dict[date, DailyEntry], today: date) -> None:
+    candidates = [
+        entry
+        for day, entry in entries.items()
+        if today - timedelta(days=EDIT_WINDOW_DAYS) <= day < today - timedelta(days=1)
+        and entry.day_type == DayType.WORK.value
+        and entry.submitted_at is not None
+    ]
+    if not candidates:
+        return
+
+    entry = max(candidates, key=lambda candidate: candidate.date)
+    entry.edited_at = entry.submitted_at + timedelta(days=1)
+    entry.updated_at = entry.edited_at
+    db.flush()
+
+
+def assessment_offsets(payload: dict, today: date, rng: random.Random) -> list[int]:
+    start = (today - history_end(payload, today)).days
+    recent = start + rng.randint(*RECENT_ASSESSMENT_OFFSETS)
+    oldest = rng.randint(*OLDEST_ASSESSMENT_OFFSETS)
+    extra = rng.sample(
+        range(recent + ASSESSMENT_GAP_DAYS, oldest - ASSESSMENT_GAP_DAYS + 1),
+        rng.randint(MIN_EXTRA_ASSESSMENTS, MAX_EXTRA_ASSESSMENTS),
+    )
+    return sorted([recent, *extra, oldest])
+
+
+def create_assessments(
+    db: Session,
+    user: User,
+    job: Job,
+    payload: dict,
+    admin: User,
+    today: date,
+    rng: random.Random,
+) -> None:
+    offsets = assessment_offsets(payload, today, rng)
+    for offset, feedback in zip(offsets, FEEDBACK[payload["name"]]):
+        created_at = datetime.combine(
+            today - timedelta(days=offset),
+            time(rng.randint(10, 16), rng.randint(0, 59)),
+        )
+        period_to = created_at.date()
+        db.add(
+            Assessment(
+                worker_id=user.id,
+                reviewer_id=job.reviewer_id,
+                job_id=job.id,
+                created_at=created_at,
+                created_by=admin.id,
+                model=ASSESSMENT_MODEL,
+                period_from=period_to - timedelta(days=ASSESSMENT_PERIOD_DAYS - 1),
+                period_to=period_to,
+                feedback_text=feedback,
+                metrics_snapshot=metrics_snapshot(job.reviewer),
+            )
+        )
+
+    db.flush()
+
+
+def seed(db: Session, today: date) -> User:
+    admin = db.query(User).filter(User.role == UserRole.ADMIN.value).first()
+    if admin is None:
+        raise SystemExit("В базе нет администратора — сначала создайте его через /api/auth/bootstrap-admin")
+
     rng = random.Random(SEED)
-    today = date.today()
 
-    db = SessionLocal()
-    try:
-        admin = db.query(User).filter(User.role == UserRole.ADMIN.value).first()
-        if admin is None:
-            raise SystemExit("В базе нет администратора — сначала создайте его через /api/auth/bootstrap-admin")
+    wipe(db)
+    _, jobs = create_catalog(db)
+    workers = create_workers(db, jobs, today)
 
-        wipe(db)
-        _, jobs = create_catalog(db)
-        workers = create_workers(db, jobs)
-
-        for payload in WORKERS:
-            user = workers[payload["name"]]
-            if payload["status"] != UserStatus.ACTIVE.value:
-                continue
-            days = entry_days(user, payload, today)
-            entries = create_entries(db, user, payload, days, today, rng)
-            fill_items(db, payload["name"], entries, rng)
+    for payload in WORKERS:
+        if not has_history(payload):
+            continue
+        user = workers[payload["name"]]
+        end = history_end(payload, today)
+        days = [day for day in entry_days(user, payload, today) if day <= end]
+        entries = create_entries(db, user, payload, days, today, rng)
+        fill_items(db, payload["name"], entries, rng)
+        if payload["edited_after_submit"]:
+            mark_edited(db, entries, today)
+        if payload["access_open"]:
             create_side_data(db, user, payload["name"], today, rng)
 
-        db.commit()
+    for payload in WORKERS:
+        if has_history(payload):
+            create_assessments(
+                db,
+                workers[payload["name"]],
+                jobs[payload["job"]],
+                payload,
+                admin,
+                today,
+                rng,
+            )
+
+    db.commit()
+    return admin
+
+
+def main() -> None:
+    db = SessionLocal()
+    try:
+        admin = seed(db, date.today())
+
+        employees = db.query(User).filter(User.role == UserRole.EMPLOYEE.value).all()
+        statuses = Counter(user.status for user in employees)
+        by_status = ", ".join(f"{status.value}: {statuses[status.value]}" for status in UserStatus)
+        off_with_reason = (
+            db.query(DailyEntry)
+            .filter(DailyEntry.day_type == DayType.OFF.value, DailyEntry.off_reason.isnot(None))
+            .count()
+        )
+        edited = db.query(DailyEntry).filter(DailyEntry.edited_at.isnot(None)).count()
 
         print(f"админ сохранён: {admin.name} <{admin.email}>")
-        print(f"работников: {db.query(User).filter(User.role == UserRole.EMPLOYEE.value).count()}")
+        print(f"работников: {len(employees)} ({by_status})")
         print(f"дейликов: {db.query(DailyEntry).count()}, строк в них: {db.query(EntryItem).count()}")
+        print(f"нерабочих дней с причиной: {off_with_reason}")
+        print(f"записей с правкой после отправки: {edited}")
+        print(f"AI-оценок: {db.query(Assessment).count()}")
         print(f"пароль всех работников: {DEMO_PASSWORD}")
     finally:
         db.close()
