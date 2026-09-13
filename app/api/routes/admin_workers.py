@@ -15,14 +15,16 @@ from app.models import DailyEntry as DailyEntryModel
 from app.models import Department as DepartmentModel
 from app.models import InternalChatMessage as InternalChatMessageModel
 from app.models import Job as JobModel
-from app.models import Statistic as StatisticModel
 from app.models import User as UserModel
 from app.models.enums import CLOSED_ITEM_STATUSES, EntryItemStatus, UserRole
 from app.services.assessments import (
     create_assessment,
+    feedback_response_instruction,
     list_worker_assessments,
+    parse_feedback_response,
     period_bounds,
     resolve_period,
+    reviewer_metric_names,
     serialize_assessment,
 )
 from app.services.daily_entries import chain_rows, group_by_chain
@@ -283,30 +285,17 @@ def get_worker_ai_feedback(
         .count()
     )
     chains = group_by_chain(chain_rows(db, worker_id))
-    statistics = (
-        db.query(StatisticModel)
-        .filter(
-            StatisticModel.user_id == worker_id,
-            StatisticModel.date >= period_from,
-            StatisticModel.date <= period_to,
-        )
-        .order_by(StatisticModel.date.desc())
-        .all()
-    )
 
     reviewer = user.job.reviewer if user.job else None
+    metric_names = reviewer_metric_names(reviewer)
     metrics_text = ""
     if reviewer and reviewer.metrics:
         metric_lines = [
-            f"- {m.get('display_name', m.get('json_name', ''))}: {m.get('description', '')}"
+            f"- {m.get('display_name', m.get('json_name', ''))} (json_name: {m.get('json_name', '')}): "
+            f"{m.get('description', '')}"
             for m in reviewer.metrics
         ]
         metrics_text = f"\nКритерии оценщика «{reviewer.name}»:\n" + "\n".join(metric_lines)
-
-    stats_text = ""
-    if statistics:
-        vals = ", ".join(str(s.value) for s in statistics[:10])
-        stats_text = f"\nЧисловые показатели (последние {len(statistics)} дней): {vals}"
 
     reports_supplement = ""
     if entries_count:
@@ -331,14 +320,13 @@ def get_worker_ai_feedback(
 
     prompt = (
         f"Ты — HR-аналитик. Дай краткую оценку сотрудника строго на основе его дейликов из внутреннего чата. "
-        f"Ответ должен быть на русском языке, 3-5 предложений. Не используй markdown. "
+        f"{feedback_response_instruction(metric_names)}"
         f"Главный и приоритетный источник данных — сообщения из внутреннего чата ниже. "
         f"Если есть формальные отчёты — учитывай их только как дополнение.\n\n"
         f"Сотрудник: {user.name}\n"
         f"Должность: {user.job.name if user.job else 'не указана'}\n"
         f"Отдел: {user.department.name if user.department else 'не указан'}\n"
         f"{metrics_text}"
-        f"{stats_text}"
         f"{reports_supplement}\n"
         f"Дейлики из чата за период {period_label} ({len(chat_messages)} сообщений):\n{chat_text}"
     )
@@ -346,12 +334,14 @@ def get_worker_ai_feedback(
     try:
         client = GigaChatClient()
         response = client.chat(prompt)
-        feedback = response["choices"][0]["message"]["content"]
+        content = response["choices"][0]["message"]["content"]
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"GigaChat unavailable: {exc}",
         ) from exc
+
+    parsed = parse_feedback_response(content, metric_names)
 
     assessment = create_assessment(
         db,
@@ -362,7 +352,8 @@ def get_worker_ai_feedback(
         model=response.get("model") or client.model or "gigachat",
         period_from=period_from,
         period_to=period_to,
-        feedback=feedback,
+        feedback=parsed.feedback,
+        scores=parsed.scores,
     )
     return WorkerAIFeedback(**serialize_assessment(assessment).model_dump())
 

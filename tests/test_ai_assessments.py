@@ -1,9 +1,11 @@
+import json
 from datetime import date, datetime, timedelta
 
 import pytest
 
-from app.models import Assessment, Department, InternalChatMessage, Job, Reviewer, User
+from app.models import Assessment, Department, InternalChatMessage, Job, Reviewer, Statistic, User
 from app.models.enums import UserRole, UserStatus
+from app.services.assessments import SCORE_MAX, SCORE_MIN, parse_feedback_response
 
 TODAY = date.today()
 
@@ -92,7 +94,10 @@ def _stored_assessment(db, worker, reviewer, created_at, metrics_snapshot=None):
 
 @pytest.fixture
 def gigachat_stub(monkeypatch):
-    calls = []
+    class StubCalls(list):
+        content = "Сотрудник стабильно закрывает задачи."
+
+    calls = StubCalls()
 
     class StubClient:
         model = "GigaChat"
@@ -104,7 +109,7 @@ def gigachat_stub(monkeypatch):
             calls.append(prompt)
             return {
                 "model": "GigaChat:1.0.26.20",
-                "choices": [{"message": {"content": "Сотрудник стабильно закрывает задачи."}}],
+                "choices": [{"message": {"content": calls.content}}],
             }
 
     monkeypatch.setattr("app.api.routes.admin_workers.GigaChatClient", StubClient)
@@ -335,3 +340,187 @@ class TestReviewerUsage:
 
     def test_unknown_reviewer_returns_404(self, client, admin_headers):
         assert client.get("/api/admin/reviewers/999/usage", headers=admin_headers).status_code == 404
+
+    def test_usage_exposes_score_scale(self, client, admin_headers, db):
+        reviewer = _reviewer(db)
+        body = client.get(f"/api/admin/reviewers/{reviewer.id}/usage", headers=admin_headers).json()
+        assert body["score_max"] == 10
+
+    def test_avg_scores_mix_scored_and_unscored_assessments(self, client, admin_headers, db):
+        reviewer = _reviewer(db)
+        worker = _worker(db, job=_job(db, reviewer))
+
+        def snapshot(delivery, quality):
+            return [
+                {"json_name": "delivery", "display_name": "Соблюдение сроков", "weight": 30, "score": delivery},
+                {"json_name": "quality", "display_name": "Качество", "weight": 20, "score": quality},
+            ]
+
+        _stored_assessment(db, worker, reviewer, datetime(2026, 7, 1, 10, 0), [])
+        _stored_assessment(db, worker, reviewer, datetime(2026, 7, 2, 10, 0), snapshot(None, None))
+        _stored_assessment(db, worker, reviewer, datetime(2026, 7, 3, 10, 0), snapshot(6, None))
+        _stored_assessment(db, worker, reviewer, datetime(2026, 7, 4, 10, 0), snapshot(9, 4))
+
+        body = client.get(f"/api/admin/reviewers/{reviewer.id}/usage", headers=admin_headers).json()
+        assert body["assessments_count"] == 4
+        assert body["avg_scores"] == [
+            {"json_name": "delivery", "display_name": "Соблюдение сроков", "avg_score": 7.5, "samples": 2},
+            {"json_name": "quality", "display_name": "Качество", "avg_score": 4.0, "samples": 1},
+        ]
+
+
+def _scores(body):
+    return {metric["json_name"]: metric["score"] for metric in body["metrics_snapshot"]}
+
+
+def _request_feedback(client, admin_headers, db, gigachat_stub, content, metrics=None):
+    reviewer = _reviewer(db, metrics)
+    worker = _worker(db, job=_job(db, reviewer))
+    _chat_message(db, worker, datetime.utcnow() - timedelta(days=1))
+    gigachat_stub.content = content
+    response = client.post(f"/api/admin/workers/{worker.id}/ai-feedback", headers=admin_headers)
+    assert response.status_code == 200
+    return reviewer, worker, response.json()
+
+
+class TestAIFeedbackScores:
+    def test_json_scores_are_stored_and_aggregated(
+        self, client, admin_headers, db, gigachat_stub
+    ):
+        content = json.dumps(
+            {"feedback": "Держит сроки, качество среднее.", "scores": {"delivery": 8, "quality": 6}},
+            ensure_ascii=False,
+        )
+        reviewer, worker, body = _request_feedback(client, admin_headers, db, gigachat_stub, content)
+
+        assert body["feedback"] == "Держит сроки, качество среднее."
+        assert _scores(body) == {"delivery": 8, "quality": 6}
+        stored = db.query(Assessment).filter(Assessment.worker_id == worker.id).one()
+        assert stored.feedback_text == "Держит сроки, качество среднее."
+        assert {m["json_name"]: m["score"] for m in stored.metrics_snapshot} == {"delivery": 8, "quality": 6}
+        assert {m["json_name"]: m["weight"] for m in stored.metrics_snapshot} == {"delivery": 30, "quality": 20}
+
+        usage = client.get(f"/api/admin/reviewers/{reviewer.id}/usage", headers=admin_headers).json()
+        assert usage["score_max"] == 10
+        assert usage["avg_scores"] == [
+            {"json_name": "delivery", "display_name": "Соблюдение сроков", "avg_score": 8.0, "samples": 1},
+            {"json_name": "quality", "display_name": "Качество", "avg_score": 6.0, "samples": 1},
+        ]
+
+    def test_json_in_code_fence_is_parsed(self, client, admin_headers, db, gigachat_stub):
+        content = (
+            "```json\n"
+            + json.dumps({"feedback": "Хорошая работа.", "scores": {"delivery": 7, "quality": 9}}, ensure_ascii=False)
+            + "\n```"
+        )
+        _, _, body = _request_feedback(client, admin_headers, db, gigachat_stub, content)
+        assert body["feedback"] == "Хорошая работа."
+        assert _scores(body) == {"delivery": 7, "quality": 9}
+
+    @pytest.mark.parametrize(
+        ("content", "expected_feedback"),
+        [
+            ('{"feedback": "Обрыв ответа', '{"feedback": "Обрыв ответа'),
+            ('["Сотрудник", 8]', '["Сотрудник", 8]'),
+            ('{"scores": {"delivery": 8}}', '{"scores": {"delivery": 8}}'),
+            ('{"feedback": "", "scores": {"delivery": 8}}', '{"feedback": "", "scores": {"delivery": 8}}'),
+            ('{"feedback": 5, "scores": {"delivery": 8}}', '{"feedback": 5, "scores": {"delivery": 8}}'),
+            ('```json\n{"scores": {"delivery": 7}}\n```', '{"scores": {"delivery": 7}}'),
+        ],
+    )
+    def test_unusable_response_keeps_text_without_scores(
+        self, client, admin_headers, db, gigachat_stub, content, expected_feedback
+    ):
+        _, _, body = _request_feedback(client, admin_headers, db, gigachat_stub, content)
+        assert body["id"] is not None
+        assert body["feedback"] == expected_feedback
+        assert _scores(body) == {"delivery": None, "quality": None}
+        assert db.query(Assessment).count() == 1
+
+    @pytest.mark.parametrize("bad_score", [0, 11, 10.5, -1, "8", True, False, None, [8], {"value": 8}])
+    def test_invalid_score_is_dropped_others_kept(
+        self, client, admin_headers, db, gigachat_stub, bad_score
+    ):
+        content = json.dumps(
+            {"feedback": "Текст.", "scores": {"delivery": bad_score, "quality": 7, "stranger": 5}}
+        )
+        _, _, body = _request_feedback(client, admin_headers, db, gigachat_stub, content)
+        assert body["feedback"] == "Текст."
+        assert _scores(body) == {"delivery": None, "quality": 7}
+
+    def test_boundary_scores_are_accepted(self, client, admin_headers, db, gigachat_stub):
+        content = json.dumps({"feedback": "Текст.", "scores": {"delivery": 1, "quality": 10}})
+        _, _, body = _request_feedback(client, admin_headers, db, gigachat_stub, content)
+        assert _scores(body) == {"delivery": 1, "quality": 10}
+
+    def test_reviewer_without_metrics_asks_only_text(self, client, admin_headers, db, gigachat_stub):
+        content = '{"feedback": "Текст.", "scores": {"delivery": 8}}'
+        _, _, body = _request_feedback(client, admin_headers, db, gigachat_stub, content, metrics=[])
+
+        prompt = gigachat_stub[0]
+        assert "3-5 предложений. Не используй markdown." in prompt
+        assert "JSON" not in prompt
+        assert "scores" not in prompt
+        assert body["feedback"] == content
+        assert body["metrics_snapshot"] == []
+
+    def test_prompt_requests_scores_by_json_name_without_statistics(
+        self, client, admin_headers, db, gigachat_stub
+    ):
+        reviewer = _reviewer(db)
+        worker = _worker(db, job=_job(db, reviewer))
+        _chat_message(db, worker, datetime.utcnow() - timedelta(days=1))
+        db.add(Statistic(user_id=worker.id, date=TODAY, value=98765))
+        db.commit()
+
+        response = client.post(f"/api/admin/workers/{worker.id}/ai-feedback", headers=admin_headers)
+        assert response.status_code == 200
+
+        prompt = gigachat_stub[0]
+        assert "строго в JSON без markdown" in prompt
+        assert '"feedback"' in prompt
+        assert '"scores"' in prompt
+        assert "от 1 до 10" in prompt
+        assert "json_name: delivery" in prompt
+        assert "json_name: quality" in prompt
+        assert "Ключи scores: delivery, quality." in prompt
+        assert "Числовые показатели" not in prompt
+        assert "98765" not in prompt
+
+
+class TestParseFeedbackResponse:
+    NAMES = ["delivery", "quality"]
+
+    def test_scale_constants(self):
+        assert (SCORE_MIN, SCORE_MAX) == (1, 10)
+
+    def test_without_metric_names_returns_raw_content(self):
+        content = '```json\n{"feedback": "Текст", "scores": {"delivery": 5}}\n```'
+        parsed = parse_feedback_response(content, [])
+        assert parsed.feedback == content
+        assert parsed.scores == {}
+
+    def test_plain_code_fence_is_stripped(self):
+        parsed = parse_feedback_response('```\n{"feedback": "Текст", "scores": {"quality": 3}}\n```', self.NAMES)
+        assert parsed.feedback == "Текст"
+        assert parsed.scores == {"quality": 3}
+
+    def test_fractional_score_in_range_is_accepted(self):
+        parsed = parse_feedback_response('{"feedback": "Текст", "scores": {"delivery": 7.5}}', self.NAMES)
+        assert parsed.scores == {"delivery": 7.5}
+
+    def test_non_finite_scores_are_dropped(self):
+        content = '{"feedback": "Текст", "scores": {"delivery": NaN, "quality": Infinity}}'
+        parsed = parse_feedback_response(content, self.NAMES)
+        assert parsed.feedback == "Текст"
+        assert parsed.scores == {}
+
+    def test_scores_not_object_keeps_feedback(self):
+        parsed = parse_feedback_response('{"feedback": "Текст", "scores": [8, 9]}', self.NAMES)
+        assert parsed.feedback == "Текст"
+        assert parsed.scores == {}
+
+    def test_missing_metric_and_extra_keys(self):
+        content = '{"feedback": "Текст", "scores": {"quality": 4, "other": 9}, "extra": true}'
+        parsed = parse_feedback_response(content, self.NAMES)
+        assert parsed.scores == {"quality": 4}

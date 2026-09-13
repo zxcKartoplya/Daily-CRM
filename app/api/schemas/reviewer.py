@@ -77,3 +77,4 @@ class ReviewerUsage(BaseModel):
     employees_covered: int
     by_month: List[ReviewerUsageMonth] = []
     avg_scores: List[ReviewerUsageMetric] = []
+    score_max: int
