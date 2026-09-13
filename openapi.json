@@ -2219,6 +2219,10 @@
             "title": "Reviewer Id",
             "type": "integer"
           },
+          "score_max": {
+            "title": "Score Max",
+            "type": "integer"
+          },
           "workers_evaluated": {
             "title": "Workers Evaluated",
             "type": "integer"
@@ -2230,7 +2234,8 @@
           "assessments_last_30_days",
           "workers_evaluated",
           "jobs_count",
-          "employees_covered"
+          "employees_covered",
+          "score_max"
         ],
         "title": "ReviewerUsage",
         "type": "object"
