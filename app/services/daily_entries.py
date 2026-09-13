@@ -155,6 +155,25 @@ def _replace_items(db: Session, entry: DailyEntryModel, ordered: list[tuple[int,
             db.delete(item)
 
 
+def _entry_content(entry: DailyEntryModel) -> tuple:
+    items = sorted(entry.items, key=lambda item: (item.position, item.chain_id))
+    return (
+        entry.day_type,
+        tuple((item.chain_id, item.text, item.status, item.link, item.position) for item in items),
+    )
+
+
+def _submitted_content(entry: DailyEntryModel | None) -> tuple | None:
+    if entry is None or entry.status != DailyEntryStatus.SUBMITTED.value:
+        return None
+    return _entry_content(entry)
+
+
+def _mark_edited(entry: DailyEntryModel, content_before: tuple | None) -> None:
+    if content_before is not None and _entry_content(entry) != content_before:
+        entry.edited_at = datetime.utcnow()
+
+
 def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWrite) -> DailyEntryModel:
     entry = get_entry(db, user.id, day)
     _ensure_writable(day)
@@ -178,6 +197,7 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
 
     ordered = _ordered_items(payload.items)
     _validate_items(db, user.id, ordered)
+    content_before = _submitted_content(entry)
 
     if entry is None:
         entry = DailyEntryModel(
@@ -193,6 +213,7 @@ def upsert_entry(db: Session, user: UserModel, day: date, payload: DailyEntryWri
         entry.day_type = payload.day_type.value
 
     _replace_items(db, entry, ordered)
+    _mark_edited(entry, content_before)
     db.flush()
     return entry
 
@@ -244,6 +265,7 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
     entries: list[DailyEntryModel] = []
     for day in days:
         entry = existing.get(day)
+        content_before = _submitted_content(entry)
         if entry is None:
             entry = DailyEntryModel(
                 user_id=user.id,
@@ -256,8 +278,10 @@ def bulk_set_day_type(db: Session, user: UserModel, payload: BulkDayTypeWrite) -
             _replace_items(db, entry, [])
 
         entry.day_type = DayType.OFF.value
+        _mark_edited(entry, content_before)
+        if content_before is None:
+            entry.submitted_at = datetime.utcnow()
         entry.status = DailyEntryStatus.SUBMITTED.value
-        entry.submitted_at = datetime.utcnow()
         entries.append(entry)
 
     db.flush()

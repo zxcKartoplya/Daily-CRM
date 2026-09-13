@@ -48,6 +48,10 @@ class DailyEntry(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AdminDailyEntry(DailyEntry):
+    edited_at: datetime | None = None
+
+
 class ChainPoint(BaseModel):
     date: date
     status: EntryItemStatus
@@ -95,7 +99,7 @@ class ChainHistory(BaseModel):
 class DepartmentDailyDay(BaseModel):
     date: date
     is_working_day: bool
-    entry: DailyEntry | None = None
+    entry: AdminDailyEntry | None = None
 
 
 class DepartmentDailyEmployee(BaseModel):

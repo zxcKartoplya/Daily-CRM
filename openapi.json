@@ -1,6 +1,81 @@
 {
   "components": {
     "schemas": {
+      "AdminDailyEntry": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "day_type": {
+            "$ref": "#/components/schemas/DayType"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DailyEntryStatus"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "date",
+          "day_type",
+          "status"
+        ],
+        "title": "AdminDailyEntry",
+        "type": "object"
+      },
       "AnalyticsOverview": {
         "properties": {
           "blocked_items_last_30_days": {
@@ -738,7 +813,7 @@
           "entry": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DailyEntry"
+                "$ref": "#/components/schemas/AdminDailyEntry"
               },
               {
                 "type": "null"
@@ -4289,7 +4364,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/DailyEntry"
+                    "$ref": "#/components/schemas/AdminDailyEntry"
                   },
                   "title": "Response List Admin Entries Api Admin Reports Get",
                   "type": "array"
@@ -4350,7 +4425,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DailyEntry"
+                  "$ref": "#/components/schemas/AdminDailyEntry"
                 }
               }
             },

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.daily_entry import DailyEntry
+from app.api.schemas.daily_entry import AdminDailyEntry
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
 from app.models import User as UserModel
@@ -14,7 +14,7 @@ from app.models import User as UserModel
 router = APIRouter()
 
 
-@router.get("", response_model=List[DailyEntry])
+@router.get("", response_model=List[AdminDailyEntry])
 def list_admin_entries(
     user_id: int | None = Query(default=None),
     department_id: int | None = Query(default=None),
@@ -24,7 +24,7 @@ def list_admin_entries(
     date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
-) -> List[DailyEntry]:
+) -> List[AdminDailyEntry]:
     query = (
         db.query(DailyEntryModel)
         .options(
@@ -49,12 +49,12 @@ def list_admin_entries(
     return query.all()
 
 
-@router.get("/{entry_id}", response_model=DailyEntry)
+@router.get("/{entry_id}", response_model=AdminDailyEntry)
 def get_admin_entry(
     entry_id: int,
     db: Session = Depends(get_db),
     _: UserModel = Depends(require_admin_user),
-) -> DailyEntry:
+) -> AdminDailyEntry:
     entry = (
         db.query(DailyEntryModel)
         .options(joinedload(DailyEntryModel.items))
