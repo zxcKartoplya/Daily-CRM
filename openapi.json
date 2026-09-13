@@ -1,6 +1,163 @@
 {
   "components": {
     "schemas": {
+      "ActivityChain": {
+        "properties": {
+          "blocked_days": {
+            "title": "Blocked Days",
+            "type": "integer"
+          },
+          "chain_id": {
+            "title": "Chain Id",
+            "type": "string"
+          },
+          "closed_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Date"
+          },
+          "closed_in_period": {
+            "title": "Closed In Period",
+            "type": "boolean"
+          },
+          "days_total": {
+            "title": "Days Total",
+            "type": "integer"
+          },
+          "first_date": {
+            "format": "date",
+            "title": "First Date",
+            "type": "string"
+          },
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ChainPoint"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "last_date": {
+            "format": "date",
+            "title": "Last Date",
+            "type": "string"
+          },
+          "last_status": {
+            "$ref": "#/components/schemas/EntryItemStatus"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ChainOutcome"
+          },
+          "started_in_period": {
+            "title": "Started In Period",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "chain_id",
+          "first_date",
+          "last_date",
+          "last_status",
+          "outcome",
+          "days_total",
+          "blocked_days",
+          "started_in_period",
+          "closed_in_period"
+        ],
+        "title": "ActivityChain",
+        "type": "object"
+      },
+      "ActivityPeriod": {
+        "enum": [
+          "week",
+          "month"
+        ],
+        "title": "ActivityPeriod",
+        "type": "string"
+      },
+      "ActivitySummary": {
+        "properties": {
+          "avg_days_to_done": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Days To Done"
+          },
+          "blocked_chains_count": {
+            "title": "Blocked Chains Count",
+            "type": "integer"
+          },
+          "blocked_days": {
+            "title": "Blocked Days",
+            "type": "integer"
+          },
+          "chains_count": {
+            "title": "Chains Count",
+            "type": "integer"
+          },
+          "done_count": {
+            "title": "Done Count",
+            "type": "integer"
+          },
+          "dropped_count": {
+            "title": "Dropped Count",
+            "type": "integer"
+          },
+          "open_count": {
+            "title": "Open Count",
+            "type": "integer"
+          },
+          "started_count": {
+            "title": "Started Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chains_count",
+          "started_count",
+          "done_count",
+          "dropped_count",
+          "open_count",
+          "blocked_chains_count",
+          "blocked_days"
+        ],
+        "title": "ActivitySummary",
+        "type": "object"
+      },
       "AdminDailyEntry": {
         "properties": {
           "date": {
@@ -562,6 +719,15 @@
         "title": "ChainItem",
         "type": "object"
       },
+      "ChainOutcome": {
+        "enum": [
+          "open",
+          "done",
+          "dropped"
+        ],
+        "title": "ChainOutcome",
+        "type": "string"
+      },
       "ChainPoint": {
         "properties": {
           "date": {
@@ -1073,6 +1239,42 @@
           }
         },
         "title": "DepartmentUpdate",
+        "type": "object"
+      },
+      "EmployeeActivity": {
+        "properties": {
+          "chains": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ActivityChain"
+            },
+            "title": "Chains",
+            "type": "array"
+          },
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "period": {
+            "$ref": "#/components/schemas/ActivityPeriod"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ActivitySummary"
+          }
+        },
+        "required": [
+          "period",
+          "date_from",
+          "date_to",
+          "summary"
+        ],
+        "title": "EmployeeActivity",
         "type": "object"
       },
       "EmployeeProfile": {
@@ -7033,6 +7235,81 @@
         "summary": "List Off Reasons",
         "tags": [
           "dictionaries"
+        ]
+      }
+    },
+    "/api/employee/activity": {
+      "get": {
+        "operationId": "get_employee_activity_api_employee_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ActivityPeriod",
+              "default": "week"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeActivity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Employee Activity",
+        "tags": [
+          "employee-activity"
         ]
       }
     },

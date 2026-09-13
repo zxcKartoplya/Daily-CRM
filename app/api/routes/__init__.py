@@ -9,6 +9,7 @@ from app.api.routes import (
     admin_workers,
     auth,
     dictionaries,
+    employee_activity,
     employee_daily,
     employee_profile,
     employee_settings,
@@ -49,6 +50,12 @@ router.include_router(
     employee_statistics.router,
     prefix="/employee/statistics",
     tags=["employee-statistics"],
+    include_in_schema=True,
+)
+router.include_router(
+    employee_activity.router,
+    prefix="/employee/activity",
+    tags=["employee-activity"],
     include_in_schema=True,
 )
 router.include_router(internal_chat.router, prefix="/employee/chat", tags=["employee-chat"], include_in_schema=True)
