@@ -6,11 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import require_admin_user
-from app.api.schemas.daily_entry import (
-    DepartmentDailies,
-    DepartmentDailyDay,
-    DepartmentDailyEmployee,
-)
+from app.api.schemas.daily_entry import DepartmentDailies, DepartmentDailyEmployee
 from app.api.schemas.department import Department, DepartmentCreate, DepartmentUpdate
 from app.db.session import get_db
 from app.models import DailyEntry as DailyEntryModel
@@ -18,7 +14,8 @@ from app.models import Department as DepartmentModel
 from app.models import Job as JobModel
 from app.models import User as UserModel
 from app.models.enums import UserRole
-from app.services.schedule import is_working_day
+from app.services.dailies_grid import build_daily_days
+from app.services.worker_statistics import days_in_range
 
 
 router = APIRouter()
@@ -191,7 +188,7 @@ def get_department_dailies(
     for entry in entries:
         by_user.setdefault(entry.user_id, {})[entry.date] = entry
 
-    period = [period_start + timedelta(days=offset) for offset in range((period_end - period_start).days + 1)]
+    period = days_in_range(period_start, period_end)
 
     return DepartmentDailies(
         department_id=department.id,
@@ -204,14 +201,7 @@ def get_department_dailies(
                 user_name=employee.name,
                 schedule_type=employee.schedule_type,
                 work_days=employee.work_days,
-                days=[
-                    DepartmentDailyDay(
-                        date=day,
-                        is_working_day=is_working_day(employee, day),
-                        entry=by_user.get(employee.id, {}).get(day),
-                    )
-                    for day in period
-                ],
+                days=build_daily_days(employee, period, by_user.get(employee.id, {})),
             )
             for employee in employees
         ],
