@@ -12,6 +12,11 @@ class UserStatus(str, Enum):
     INVITED = "invited"
 
 
+class UserAccessStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 class ScheduleType(str, Enum):
     WEEKLY = "weekly"
     NONE = "none"

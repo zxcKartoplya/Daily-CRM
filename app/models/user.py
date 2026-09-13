@@ -17,6 +17,7 @@ class User(Base):
     role = Column(String, nullable=False, default=UserRole.EMPLOYEE.value)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     status = Column(String, nullable=False, default=UserStatus.ACTIVE.value)
+    last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
